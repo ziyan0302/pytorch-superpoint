@@ -1,1 +1,14 @@
 *.hdf5
+runs/
+__pycache__/
+datasets/draw_checkerboard/
+datasets/draw_cube/
+datasets/draw_ellipses/
+datasets/draw_lines/
+datasets/draw_multiple_polygons/
+datasets/draw_polygon/
+datasets/draw_star/
+datasets/draw_stripes/
+datasets/gaussian_noise/
+datasets/synthetic_shapes_v6/
+logs/

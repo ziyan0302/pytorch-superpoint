@@ -10,6 +10,7 @@ from utils.tools import dict_update
 import cv2
 from utils.utils import homography_scaling_torch as homography_scaling
 from utils.utils import filter_points
+import pdb
 
 class Coco(data.Dataset):
     default_config = {
@@ -48,6 +49,7 @@ class Coco(data.Dataset):
 
         # Update config
         self.config = self.default_config
+        pdb.set_trace()
         self.config = dict_update(self.config, config)
 
         self.transforms = transform
