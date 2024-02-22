@@ -2,12 +2,15 @@
 # torchvision
 argparse
 scipy
-opencv-python==3.4.2.16
-opencv-contrib-python==3.4.2.16
+# opencv-python==3.4.2.16
+# opencv-contrib-python==3.4.2.16
+opencv-python
+opencv-contrib-python
 matplotlib
 imageio
 tqdm
-tensorflow==1.14.0
+# tensorflow==1.14.0
+tensorflow
 tensorboardX
 tqdm
 pyyaml

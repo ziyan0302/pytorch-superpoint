@@ -12,6 +12,9 @@ from utils.utils import homography_scaling_torch as homography_scaling
 from utils.utils import filter_points
 import h5py
 import pdb
+import sys
+sys.path.append("./datasets")
+from event_utils import gen_discretized_event_volume
 
 
 class Mvsec(data.Dataset):
@@ -49,6 +52,8 @@ class Mvsec(data.Dataset):
 
     def __init__(self, export=False, transform=None, task='train', **config):
 
+        # temporary fixed config
+        self.flow_time_bins = 9
         # Update config
         self.config = self.default_config
         self.config = dict_update(self.config, config)
@@ -59,45 +64,109 @@ class Mvsec(data.Dataset):
         # get files
         file_path = Path(DATA_PATH, 'mvsec_dataset/outdoor_day1_data.hdf5')  # Update with your HDF5 file path
         with h5py.File(file_path, 'r') as hf:
-            self.data = hf['davis']['left']['image_raw']
-            self.labels = hf['davis']['left']['image_raw_ts'] if config['labels'] else None
+            events_raw = hf['davis']['left']['events'][:1000]
+            imageN, imageH, imageW = hf['davis']['left']['image_raw'].shape
+            event_volume = gen_discretized_event_volume(torch.tensor(events_raw).cpu(),
+                                                    [self.flow_time_bins*2,
+                                                     imageH,
+                                                     imageW])
+            self.data = event_volume
     
-        pdb.set_trace()
-        sequence_set = []
-        # prepare seqence_set as in coco
-        # for iData in range(len(self.data)):
-        #     sample = {'image': self.data[iData], 'name': name, 'points': str(p)}
-        #     sequence_set.append(sample)
-                    
-    def _get_data(self, split_name, **config):
-        has_keypoints = True if self.labels else False
-        is_training = split_name == 'training'
+            sequence_set = []
+            # prepare seqence_set as in coco
+            if (0):
+                self.data.shape
+                tmp_event = hf['davis']['left']['events']
+                tmp_event.shape
+                events_raw.shape
+                event_volume.shape
+            for iData in range(len(self.data)):
+                sample = {'image': self.data[iData], 'name': iData}
+                sequence_set.append(sample)
+            self.samples = sequence_set
 
-        def _preprocess(image):
-            image = tf.image.rgb_to_grayscale(image)
-            if config['preprocessing']['resize']:
-                image = pipeline.ratio_preserving_resize(image,
-                                                         **config['preprocessing'])
-            return image
+        
+        self.init_var()
+        pass
 
-        # Python function to read labels
-        def _read_labels(idx):
-            return self.labels[idx] if self.labels else None
+    def init_var(self):
+        torch.set_default_tensor_type(torch.FloatTensor)
+        from utils.homographies import sample_homography_np as sample_homography
+        from utils.utils import inv_warp_image
+        from utils.utils import compute_valid_mask
+        from utils.photometric import ImgAugTransform, customizedTransform
+        from utils.utils import inv_warp_image, inv_warp_image_batch, warp_points
+        
+        self.sample_homography = sample_homography
+        self.inv_warp_image = inv_warp_image
+        self.inv_warp_image_batch = inv_warp_image_batch
+        self.compute_valid_mask = compute_valid_mask
+        self.ImgAugTransform = ImgAugTransform
+        self.customizedTransform = customizedTransform
+        self.warp_points = warp_points
 
-        # Create TensorFlow dataset
-        dataset = tf.data.Dataset.range(len(self.data))
-        dataset = dataset.map(lambda idx: (self.data[idx], _read_labels(idx)))
+        self.enable_homo_train = self.config['augmentation']['homographic']['enable']
+        self.enable_homo_val = False
 
-        # Preprocess images
-        dataset = dataset.map(lambda data, label: (_preprocess(data), label))
+        self.cell_size = 8
+        if self.config['preprocessing']['resize']:
+            self.sizer = self.config['preprocessing']['resize']
 
-        # Keep only the first elements for validation
-        if split_name == 'validation':
-            dataset = dataset.take(config['validation_size'])
+        self.gaussian_label = False
+        if self.config['gaussian_label']['enable']:
+            self.gaussian_label = True
+            y, x = self.sizer
 
-        # Cache to avoid always reading from disk
-        if config['cache_in_memory']:
-            tf.logging.info('Caching data, first access will take some time.')
-            dataset = dataset.cache()
+        pass
 
-        return dataset
+
+    def __getitem__(self, index):
+        '''
+
+        :param index:
+        :return:
+            image: tensor (H, W, channel=1)
+        '''
+        def _read_image(input_image):
+            input_image = np.transpose(input_image, (1, 2, 0))
+            input_image = cv2.resize(input_image, (self.sizer[1], self.sizer[0]),
+                                     interpolation=cv2.INTER_AREA)
+            H, W = input_image.shape[0], input_image.shape[1]
+            # H = H//cell*cell
+            # W = W//cell*cell
+            # input_image = input_image[:H,:W,:]
+            input_image = cv2.cvtColor(input_image, cv2.COLOR_RGB2GRAY)
+
+            input_image = input_image.astype('float32') / 255.0
+            return input_image
+
+        to_floatTensor = lambda x: torch.tensor(x).type(torch.FloatTensor)
+
+        from numpy.linalg import inv
+        sample = self.samples[index]
+        input  = {}
+        input.update(sample)
+        # image
+        img_o = _read_image(sample['image'])
+        # img_o = sample['image']
+        H, W = img_o.shape[0], img_o.shape[1]
+        # print(f"image: {image.shape}")
+        img_aug = img_o.copy()
+
+        img_aug = torch.tensor(img_aug, dtype=torch.float32).view(-1, H, W)
+
+        valid_mask = self.compute_valid_mask(torch.tensor([H, W]), inv_homography=torch.eye(3))
+        input.update({'image': img_aug})
+        input.update({'valid_mask': valid_mask})
+
+        name = sample['name']
+
+        input.update({'name': name, 'scene_name': "./"}) # dummy scene name
+        return input
+
+    def __len__(self):
+            return len(self.samples)
+
+
+
+   
