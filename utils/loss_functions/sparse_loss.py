@@ -156,6 +156,8 @@ def descriptor_loss_sparse(descriptors, descriptors_warped, homographies, mask_v
 
     homographies_H = scale_homography_torch(homographies, img_shape, shift=(-1, -1))
 
+    import pdb
+    # pdb.set_trace()
     # print("experiment inverse homographies")
     # homographies_H = torch.stack([torch.inverse(H) for H in homographies_H])
     # print("homographies_H: ", homographies_H.shape)
@@ -197,6 +199,7 @@ def descriptor_loss_sparse(descriptors, descriptors_warped, homographies, mask_v
     # print("matches_b: ", matches_b.shape)
     # print("matches_b max: ", matches_b.max())
 
+    # important loss
     if method == '2d':
         match_loss = get_match_loss(descriptors, descriptors_warped, matches_a.to(device), 
             matches_b.to(device), dist=dist, method='2d')

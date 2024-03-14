@@ -48,7 +48,7 @@ data:
             allow_artifacts: true # true
         valid_border_margin: 3
 
-front_end_model: 'Train_model_heatmap'  # 'Train_model_frontend'
+front_end_model: 'Train_model_heatmap_mvsec'  # 'Train_model_frontend'
 
 training:
     workers_train: 4 # 16
@@ -64,7 +64,7 @@ model:
         loss_type: 'softmax'
 
 
-    batch_size: 8 # 32
+    batch_size: 1 # 32
     eval_batch_size: 8 # 32
     learning_rate: 0.0001 # 0.0001
     detection_threshold: 0.015 # 0.015
@@ -84,6 +84,7 @@ model:
             dist: 'cos'
             method: '2d'
     other_settings: 'train 2d, gauss 0.2'
+    pretrained: '/home/ziyan/02_research/pytorch-superpoint/logs/superpoint_mvsec/checkpoints/superPointNet_18000_checkpoint.pth.tar'
     # subpixel:
         # enable: false
         # params:

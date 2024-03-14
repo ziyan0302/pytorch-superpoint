@@ -184,6 +184,7 @@ class Train_model_heatmap(Train_model_frontend):
         task = "train" if train else "val"
         tb_interval = self.config["tensorboard_interval"]
         if_warp = self.config['data']['warped_pair']['enable']
+        print("if_warp: ", if_warp)
 
         self.scalar_dict, self.images_dict, self.hist_dict = {}, {}, {}
         ## get the inputs

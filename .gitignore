@@ -12,3 +12,7 @@ datasets/draw_stripes/
 datasets/gaussian_noise/
 datasets/synthetic_shapes_v6/
 logs/
+tmp.jpg
+output.txt
+nohup.out
+test.py

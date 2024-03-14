@@ -21,6 +21,7 @@ class double_conv(nn.Module):
         )
 
     def forward(self, x):
+        x = x.to(self.conv[0].bias.dtype)
         x = self.conv(x)
         return x
 

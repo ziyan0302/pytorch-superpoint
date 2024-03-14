@@ -318,7 +318,7 @@ class Train_model_frontend(object):
         """
         # 2D mask is constructed into 3D (Hc, Wc) space for training
         :param mask_2D:
-            tensor [batch, 1, H, W]
+            tensor [batch, 1, H, W] # [1,1,320,240]
         :param cell_size:
             8 (default)
         :param device:
@@ -327,8 +327,8 @@ class Train_model_frontend(object):
         """
         mask_3D = labels2Dto3D(
             mask_2D.to(device), cell_size=cell_size, add_dustbin=False
-        ).float()
-        mask_3D_flattened = torch.prod(mask_3D, 1)
+        ).float() # [1,62,40,30]
+        mask_3D_flattened = torch.prod(mask_3D, 1) # [1,40,30]
         return mask_3D_flattened
 
     def get_loss(self, semi, labels3D_in_loss, mask_3D_flattened, device="cpu"):
@@ -716,11 +716,17 @@ class Train_model_frontend(object):
             int - number of images
         :return:
         """
+        import pdb
+        tb_imgs.keys()
         for element in list(tb_imgs):
             for idx in range(tb_imgs[element].shape[0]):
                 if idx >= max_img:
                     break
-                # print(f"element: {element}")
+                print(f"element: {element}")
+                # pdb.set_trace()
+                tb_imgs[element][idx, ...].shape
+                if element == 'image' or element == "warped_img":
+                    continue
                 self.writer.add_image(
                     task + "-" + element + "/%d" % idx,
                     tb_imgs[element][idx, ...],
