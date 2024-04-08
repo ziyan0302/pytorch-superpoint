@@ -137,6 +137,9 @@ def sample_homography_np(
     # p_mat = tf.transpose(tf.stack(
     #     [[pts2[i][j] for i in range(4) for j in range(2)]], axis=0))
     # homography = tf.transpose(tf.matrix_solve_ls(a_mat, p_mat, fast=True))
+    # print("pts1+shift: ", pts1+shift, "pts2+shift: ", pts2+shift)
+    # import pdb
+    # pdb.set_trace()
     homography = cv2.getPerspectiveTransform(np.float32(pts1+shift), np.float32(pts2+shift))
     return homography
 

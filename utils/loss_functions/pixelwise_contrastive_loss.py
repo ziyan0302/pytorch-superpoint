@@ -1,5 +1,6 @@
 import torch
 from torch.autograd import Variable
+import pdb
 
 
 class PixelwiseContrastiveLoss(object):
@@ -220,10 +221,40 @@ class PixelwiseContrastiveLoss(object):
         :return: torch.FloatTensor with shape torch.Shape([num_non_matches])
         :rtype:
         """
-
+        # print("non_matches_a.shape: ", non_matches_a.shape)
+        # print("non_matches_b.shape: ", non_matches_b.shape)
+        # print("clamp non_matches_a to be max=image_a_pred.shape[1]")
+        # non_matches_a.clamp_(max=image_a_pred.shape[1]-1)
+        # print("non_matches_a.min max: ", non_matches_a.min(), non_matches_a.max())
+        # print("non_matches_b.min max: ", non_matches_b.min(), non_matches_b.max())
+        if (0):
+            tmp = torch.tensor([1364], device="cuda:0")
+            torch.index_select(image_a_pred, 1, tmp).squeeze()
         non_matches_a_descriptors = torch.index_select(image_a_pred, 1, non_matches_a).squeeze()
         non_matches_b_descriptors = torch.index_select(image_b_pred, 1, non_matches_b).squeeze()
+        # print("non_matches_a_descriptors.shape: ", non_matches_a_descriptors.shape)
+        # non_matches_a_descriptors = non_matches_a_descriptors.to("cpu")
+        # print("============================after cpu===============================")
+        # for iNA in range(non_matches_a_descriptors.shape[0]):
+        #         if (iNA % 10000 == 1):
+        #             print("iNA: ", iNA)
+        #         if (iNA % 20000 == 1):
+        #             for jNA in range(non_matches_a_descriptors.shape[1]):
+        #                 if (jNA % 50 == 1):
+        #                     print("iNA: ", iNA, " jNA: ", jNA)
+        #                     print("value: ", non_matches_a_descriptors[iNA, jNA])
+        # print("==============================================================")
+        # non_matches_a_descriptors = torch.ones_like(non_matches_a_descriptors) * 10.
+        non_matches_a_descriptors = non_matches_a_descriptors.to("cuda:0")
 
+        # print("non_matches_a_descriptors.min max: ", non_matches_a_descriptors.min(), non_matches_a_descriptors.max())
+        # print("non_matches_b_descriptors.shape: ", non_matches_b_descriptors.shape)
+        # print("non_matches_b_descriptors.min max: ", non_matches_b_descriptors.min(), non_matches_b_descriptors.max())
+        if (0):
+            non_matches_a.shape
+            torch.unique(non_matches_a).shape
+            torch.unique(non_matches_b).shape
+            non_matches_a_descriptors.shape
         # crazily enough, if there is only one element to index_select into
         # above, then the first dimension is collapsed down, and we end up 
         # with shape [D,], where we want [1,D]
@@ -231,12 +262,15 @@ class PixelwiseContrastiveLoss(object):
         if len(non_matches_a) == 1:
             non_matches_a_descriptors = non_matches_a_descriptors.unsqueeze(0)
             non_matches_b_descriptors = non_matches_b_descriptors.unsqueeze(0)
-
+        # print("debug1")
         norm_degree = 2
+
         if dist == 'cos':
             non_match_loss = (non_matches_a_descriptors * non_matches_b_descriptors).sum(dim=-1)
         else:
             non_match_loss = (non_matches_a_descriptors - non_matches_b_descriptors).norm(norm_degree, 1)
+        # print("non_match_loss: ", non_match_loss)
+        
         if not invert:
             non_match_loss = torch.clamp(M - non_match_loss, min=0).pow(2)
         else:
@@ -244,9 +278,25 @@ class PixelwiseContrastiveLoss(object):
                 non_match_loss = torch.clamp(non_match_loss - M, min=0)
             else:
                 non_match_loss = torch.clamp(non_match_loss - M, min=0).pow(2)
-
+        # print("non_match_loss: ", non_match_loss.shape)
+        # print("non_match_loss bigger?: ", non_match_loss[0] > 10)
+        # print("non_matches_a_descriptors: ", non_matches_a_descriptors.shape)
+        # pdb.set_trace()
+        # print("debug2")
+        # print("non_match_loss: ", non_match_loss.cpu().detach().numpy())
+        # pdb.set_trace()
+        # Create a boolean mask for nonzero elements
+        nonzero_mask = non_match_loss != 0
+        # print("nonzero_mask: ", nonzero_mask)
+        # Use boolean indexing to get indices of nonzero elements
+        # print("debug2-2")
+        indices = torch.nonzero(nonzero_mask, as_tuple=False)
+        # print("debug2-3")
         hard_negative_idxs = torch.nonzero(non_match_loss)
+        # print("debug3")
         num_hard_negatives = len(hard_negative_idxs)
+        # import pdb
+        # pdb.set_trace()
 
         return non_match_loss, num_hard_negatives, non_matches_a_descriptors, non_matches_b_descriptors
 

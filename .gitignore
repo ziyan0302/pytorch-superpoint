@@ -16,3 +16,4 @@ tmp.jpg
 output.txt
 nohup.out
 test.py
+*.jpg

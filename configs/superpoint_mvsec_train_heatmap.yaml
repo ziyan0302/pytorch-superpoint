@@ -36,9 +36,9 @@ data:
     warped_pair:
         enable: true
         params:
-            translation: true
-            rotation: true
-            scaling: true
+            translation: false # true
+            rotation: false # true
+            scaling: false # true
             perspective: true
             scaling_amplitude: 0.2
             perspective_amplitude_x: 0.2
@@ -51,8 +51,8 @@ data:
 front_end_model: 'Train_model_heatmap_mvsec'  # 'Train_model_frontend'
 
 training:
-    workers_train: 4 # 16
-    workers_val: 2 # 2
+    workers_train: 0 # 16
+    workers_val: 0 # 2
 
 model:
     # name: 'magic_point'

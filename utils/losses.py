@@ -67,7 +67,7 @@ def extract_patch_from_points(heatmap, points, patch_size=5):
     heatmap = heatmap.squeeze()  # [H, W]
     # padding
     pad_size = int(patch_size/2)
-    heatmap = np.pad(heatmap, pad_size, 'constant')
+    heatmap = np.pad(heatmap, pad_size+1, 'constant')
     # crop it
     patches = []
     ext = lambda img, pnt, wid: img[pnt[1]:pnt[1]+wid, pnt[0]:pnt[0]+wid]

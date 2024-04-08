@@ -210,14 +210,19 @@ class SuperPointFrontend_torch(object):
         ##### check not take care of batch #####
         # print("not take care of batch! only take first element!")
         pts = pts[0].transpose().copy()
+        # import pdb
+        # pts.shape
         patches = extract_patch_from_points(self.heatmap, pts, patch_size=patch_size)
+        # [patch.shape for patch in patches]
+        # len(patches)
+        # patches[17].shape
+        # tmp = np.stack(patches[:16])
         import torch
         patches = np.stack(patches)
         patches_torch = torch.tensor(patches, dtype=torch.float32).unsqueeze(0)
 
         # norm patches
         patches_torch = norm_patches(patches_torch)
-
         from utils.losses import do_log
         patches_torch = do_log(patches_torch)
         # patches_torch = do_log(patches_torch)

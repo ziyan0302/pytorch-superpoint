@@ -139,6 +139,7 @@ class Mvsec(data.Dataset):
                 indices = (self.image_raw_ts[index] < events_raw[:,2]) &  (events_raw[:,2] < self.image_raw_ts[index+1])
                 events_within_bounds = events_raw[indices]
                 imageN, imageH, imageW = hf['davis']['left']['image_raw'].shape
+                self.raw_image = hf['davis']['left']['image_raw'][index]
                 event_volume = gen_discretized_event_volume(torch.tensor(events_within_bounds).cpu(),
                                                         [self.flow_time_bins*2,
                                                         imageH,
@@ -154,9 +155,9 @@ class Mvsec(data.Dataset):
                     tmp_event.shape
                     events_raw.shape
                     event_volume.shape
-                for iData in range(len(self.data)):
-                    sample = {'image': self.data[iData], 'name': iData}
-                    sequence_set.append(sample)
+                # for iData in range(len(self.data)):
+                #     sample = {'image': self.data[iData], 'name': iData, 'raw_image': raw_image}
+                #     sequence_set.append(sample)
 
 
         if (0):
@@ -182,15 +183,16 @@ class Mvsec(data.Dataset):
         if (1):
             img_aug = self.data
             valid_mask = self.compute_valid_mask(torch.tensor([self.sizer[1], self.sizer[0]]), inv_homography=torch.eye(3))
-            input  = {'image': img_aug, 'name': index}
+            input  = {'image': img_aug, 'name': index, 'raw_image': self.raw_image}
             input.update({'valid_mask': valid_mask})
             
-        if self.config['homography_adaptation']['enable']:
+        if self.config['homography_adaptation']['enable']: # disable
             # img_aug = torch.tensor(img_aug)
             homoAdapt_iter = self.config['homography_adaptation']['num']
-            homographies = np.stack([self.sample_homography(np.array([2, 2]), shift=-1,
+            homographies = np.stack([self.sample_homography(np.array([1, 1]), shift=0,
                            **self.config['homography_adaptation']['homographies']['params'])
                            for i in range(homoAdapt_iter)])
+            print("homographies: ", homographies)
             ##### use inverse from the sample homography
             homographies = np.stack([inv(homography) for homography in homographies])
             homographies[0,:,:] = np.identity(3)
@@ -211,8 +213,8 @@ class Mvsec(data.Dataset):
             input.update({'image': warped_img, 'valid_mask': valid_mask, 'image_2D':img_aug})
             input.update({'homographies': homographies, 'inv_homographies': inv_homographies})
 
-        if self.config['warped_pair']['enable']:
-            homography = self.sample_homography(np.array([2, 2]), shift=-1,
+        if self.config['warped_pair']['enable']: # enable
+            homography = self.sample_homography(np.array([1, 1]), shift=0,
                                         **self.config['warped_pair']['params'])
 
             ##### use inverse from the sample homography
@@ -223,10 +225,26 @@ class Mvsec(data.Dataset):
             homography = torch.tensor(homography).type(torch.FloatTensor)
             inv_homography = torch.tensor(inv_homography).type(torch.FloatTensor)
 
+            # homographically transform raw image
+            warped_rawImg = torch.tensor(input['raw_image'], dtype=torch.float32)
+            warped_rawImg = self.inv_warp_image(warped_rawImg.squeeze(), inv_homography, mode='bilinear').unsqueeze(0) 
+            if (0):
+                import matplotlib.pyplot as plt
+                plt.figure()
+                plt.imshow(warped_rawImg.numpy())
+                plt.savefig("tmp.jpg")
+            H = warped_rawImg.shape[3]
+            W = warped_rawImg.shape[4]
+            warped_rawImg = warped_rawImg.view(-1, H, W)
+            input.update({'warped_rawImg': warped_rawImg})
+
+
+
             # photometric augmentation from original image
 
             # warp original image
-            warped_img = torch.tensor(self.data, dtype=torch.float32)
+            # warped_img = torch.tensor(self.data, dtype=torch.float32)
+            warped_img = self.data.clone().detach().to(torch.float32)
             warped_img = self.inv_warp_image(warped_img.squeeze(), inv_homography, mode='bilinear').unsqueeze(0) 
             # print("warped_img: ", warped_img.shape)
             # print("==========================================")

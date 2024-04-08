@@ -155,6 +155,12 @@ class Val_model_heatmap(SuperPointFrontend_torch):
         return desc_sparse_batch
 
 
+    def desc_to_sparseDesc_modified(self, pts_list):
+        # pts_nms_batch = [self.getPtsFromHeatmap(h) for h in heatmap_np]
+        desc_sparse_batch = [self.sample_desc_from_points(self.outs['desc'], pts) for pts in pts_list]
+        self.desc_sparse_batch = desc_sparse_batch
+        return desc_sparse_batch
+
 
 if __name__ == '__main__':
     # filename = 'configs/magicpoint_shapes_subpix.yaml'

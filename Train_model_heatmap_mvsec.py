@@ -263,12 +263,7 @@ class Train_model_heatmap_mvsec(Train_model_frontend):
         lambda_loss = self.config["model"]["lambda_loss"]
         # print("mask_desc: ", mask_desc.shape)
         # print("mask_warp_2D: ", mask_warp_2D.shape)
-        if (0):
-            coarse_desc.shape
-            coarse_desc_warp.shape
-            mat_H
-            mask_desc.shape
-            torch.where(mask_desc != 1.)
+        
         # descriptor loss
         if lambda_loss > 0:
             assert if_warp == True, "need a pair of images"
@@ -276,6 +271,7 @@ class Train_model_heatmap_mvsec(Train_model_frontend):
                 coarse_desc,
                 coarse_desc_warp,
                 mat_H,
+                img,
                 mask_valid=mask_desc,
                 device=self.device,
                 **self.desc_params
@@ -283,7 +279,10 @@ class Train_model_heatmap_mvsec(Train_model_frontend):
         else:
             ze = torch.tensor([0]).to(self.device)
             loss_desc, positive_dist, negative_dist = ze, ze, ze
-
+        if None in [loss_desc, positive_dist, negative_dist]:
+            print("loss_desc, positive_dist, negative_dist: ", loss_desc, positive_dist, negative_dist)
+            print("skipping loss backward!!!!!!!!!!!!!!!11")
+            return None
         # loss = loss_det + loss_det_warp
         loss = loss_det_warp
         if lambda_loss > 0:
@@ -367,6 +366,7 @@ class Train_model_heatmap_mvsec(Train_model_frontend):
         self.input_to_imgDict(sample, self.images_dict)
 
         if train:
+            # pdb.set_trace()
             loss.backward()
             self.optimizer.step()
 

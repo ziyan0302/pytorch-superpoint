@@ -367,7 +367,9 @@ def inv_warp_image_batch_mvsec(img, mat_homo_inv, device='cpu', mode='bilinear')
         tensor [batch_size, 1, H, W]
     '''
     # compute inverse warped points
-    if len(img.shape) == 2 or len(img.shape) == 3:
+    if len(img.shape) == 2:
+        img = img.view(1, img.shape[0], img.shape[1])
+    if len(img.shape) == 3:
         img = img.view(1, img.shape[0], img.shape[1], img.shape[2])
     if len(mat_homo_inv.shape) == 2:
         mat_homo_inv = mat_homo_inv.view(1,3,3)
