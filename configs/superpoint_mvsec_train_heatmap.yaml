@@ -51,8 +51,8 @@ data:
 front_end_model: 'Train_model_heatmap_mvsec'  # 'Train_model_frontend'
 
 training:
-    workers_train: 0 # 16
-    workers_val: 0 # 2
+    workers_train:  16
+    workers_val:  2
 
 model:
     # name: 'magic_point'
@@ -84,7 +84,8 @@ model:
             dist: 'cos'
             method: '2d'
     other_settings: 'train 2d, gauss 0.2'
-    pretrained: '/home/ziyan/02_research/pytorch-superpoint/logs/superpoint_mvsec/checkpoints/superPointNet_18000_checkpoint.pth.tar'
+    # pretrained: '/home/ziyan/02_research/pytorch-superpoint/logs/superpoint_mvsec/checkpoints/superPointNet_3600_checkpoint.pth.tar'
+    pretrained: '/home/ziyan/02_research/pytorch-superpoint/logs/superpoint_mvsec/checkpoints/superPointNet_60000_checkpoint.pth.tar'
     # subpixel:
         # enable: false
         # params:

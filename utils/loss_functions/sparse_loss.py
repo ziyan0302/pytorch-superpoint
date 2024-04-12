@@ -301,7 +301,7 @@ def descriptor_loss_sparse(descriptors, descriptors_warped, homographies, img, m
                                         non_matches_b.to(device), dist=dist)
     # non_match_loss = non_match_loss.mean()
     loss = lamda_d * match_loss + non_match_loss
-    print("loss: ", loss, " match_loss: ", match_loss, " nonMatLoss: ", non_match_loss)
+    # print("loss: ", loss, " match_loss: ", match_loss, " nonMatLoss: ", non_match_loss)
     return loss, lamda_d * match_loss, non_match_loss
     pass
 

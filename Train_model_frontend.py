@@ -722,7 +722,7 @@ class Train_model_frontend(object):
             for idx in range(tb_imgs[element].shape[0]):
                 if idx >= max_img:
                     break
-                print(f"element: {element}")
+                # print(f"element: {element}")
                 # pdb.set_trace()
                 tb_imgs[element][idx, ...].shape
                 if element == 'image' or element == "warped_img":
