@@ -85,7 +85,7 @@ model:
             method: '2d'
     other_settings: 'train 2d, gauss 0.2'
     # pretrained: '/home/ziyan/02_research/pytorch-superpoint/logs/superpoint_mvsec/checkpoints/superPointNet_3600_checkpoint.pth.tar'
-    pretrained: '/home/ziyan/02_research/pytorch-superpoint/logs/superpoint_mvsec/checkpoints/superPointNet_60000_checkpoint.pth.tar'
+    pretrained: '/home/ziyan/02_research/pytorch-superpoint/logs/superpoint_mvsec/checkpoints/superPointNet_10000_checkpoint.pth.tar'
     # subpixel:
         # enable: false
         # params:
