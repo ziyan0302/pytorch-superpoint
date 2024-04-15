@@ -51,8 +51,8 @@ data:
 front_end_model: 'Train_model_heatmap_mvsec'  # 'Train_model_frontend'
 
 training:
-    workers_train:  16
-    workers_val:  2
+    workers_train: 1 #16
+    workers_val: 1 #2
 
 model:
     # name: 'magic_point'

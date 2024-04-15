@@ -155,25 +155,16 @@ def descriptor_loss_sparse(descriptors, descriptors_warped, homographies, img, m
     from utils.utils import filter_points
     from utils.utils import crop_or_pad_choice
     from utils.utils import normPts
-    # ##### print configs
-    # print("num_masked_non_matches_per_match: ", num_masked_non_matches_per_match)
-    # print("num_matching_attempts: ", num_matching_attempts)
-    # dist = 'cos'
-    # print("method: ", method)
 
     Hc, Wc = descriptors.shape[1], descriptors.shape[2]
     img_shape = (Hc, Wc)
-    # print("img_shape: ", img_shape)
-    # img_shape_cpu = (Hc.to('cpu'), Wc.to('cpu'))
 
-    # image_a_pred = descriptors.view(1, -1, Hc * Wc).transpose(1, 2)  # torch [batch_size, H*W, D]
     def descriptor_reshape(descriptors):
         descriptors = descriptors.view(-1, Hc * Wc).transpose(0, 1)  # torch [D, H, W] --> [H*W, d]
         descriptors = descriptors.unsqueeze(0)  # torch [1, H*W, D]
         return descriptors
 
     image_a_pred = descriptor_reshape(descriptors)  # torch [1, H*W, D]
-    # print("image_a_pred: ", image_a_pred.shape)
     image_b_pred = descriptor_reshape(descriptors_warped)  # torch [batch_size, H*W, D]
 
     # matches
@@ -188,36 +179,13 @@ def descriptor_loss_sparse(descriptors, descriptors_warped, homographies, img, m
         
 
     homographies_H = scale_homography_torch(homographies, img_shape, shift=(-1, -1))
-    # print("experiment inverse homographies")
-    # homographies_H = torch.stack([torch.inverse(H) for H in homographies_H])
-    # print("homographies_H: ", homographies_H.shape)
-    # homographies_H = torch.inverse(homographies_H)
 
 
     uv_b_matches = warp_coor_cells_with_homographies(uv_a, homographies_H.to('cpu'), uv=True, device='cpu')
-    if (0):
-        tmp = findInterestPoints(img, blockSize=2, ksize=1, k=0.1)
-        tmp = torch.from_numpy(tmp).float()
-        tmp.shape
-        tmp0 = torch.concat([tmp[0].clone(),torch.tensor([1.])])
-        tmp1 = homographies_H.to('cpu') @ tmp0
-        tmp1 = tmp1 / tmp1[2]
-        tmp_matches = warp_coor_cells_with_homographies(tmp, homographies_H.to('cpu'), uv=True, device='cpu')
-        tmp_matches.squeeze(0).shape
-        tmp_matches.round_()
-        tmp_matches1, mask1 = filter_points(tmp_matches, torch.tensor([Wc, Hc]).to(device='cpu'), return_mask=True)
-        tmp_matches1.shape
-        torch.count_nonzero(mask1)
-        mask1
-
-    # print("uv_b_matches before round: ", uv_b_matches[0])
-
     uv_b_matches.round_() 
-    # print("uv_b_matches after round: ", uv_b_matches[0])
     uv_b_matches = uv_b_matches.squeeze(0)
 
     # filtering out of range points
-    # choice = crop_or_pad_choice(x_all.shape[0], self.sift_num, shuffle=True)
 
 
     uv_b_matches, mask = filter_points(uv_b_matches, torch.tensor([Wc, Hc]).to(device='cpu'), return_mask=True)
@@ -236,21 +204,13 @@ def descriptor_loss_sparse(descriptors, descriptors_warped, homographies, img, m
     # crop to the same length
     shuffle = True
     if not shuffle: print("shuffle: ", shuffle)
-    # import pdb
-    # if uv_b_matches.shape[0] == 0:
-    #     pdb.set_trace()
     choice = crop_or_pad_choice(uv_b_matches.shape[0], num_matching_attempts, shuffle=shuffle)
     # resample the points to be a index array with fixed amount=1000
     choice = torch.tensor(choice).type(torch.int64)
     choice.shape
     uv_a = uv_a[choice]
     uv_b_matches = uv_b_matches[choice]
-    # print("uv_a[0].max min: ", uv_a[:,0].max(), " ", uv_a[:,0].min())
-    # print("uv_a[1].max min: ", uv_a[:,1].max(), " ", uv_a[:,1].min())
-    if (0):
-        shape = torch.tensor([Wc, Hc]).float()
-        tmp = uv_a[0]
-        tmp = tmp/shape*2 - 1
+
     if method == '2d':
         matches_a = normPts(uv_a, torch.tensor([Wc, Hc]).float()) # [u, v] # [-1,1]
         matches_b = normPts(uv_b_matches, torch.tensor([Wc, Hc]).float()) # [-1,1]
@@ -273,36 +233,15 @@ def descriptor_loss_sparse(descriptors, descriptors_warped, homographies, img, m
     uv_a_tuple, uv_b_non_matches_tuple = get_non_matches_corr(img_shape,
                                             uv_a, uv_b_matches,
                                             num_masked_non_matches_per_match=num_masked_non_matches_per_match)
-    # print("uv_a_tuple[0].max min: ", uv_a_tuple[0].max(), " ", uv_a_tuple[0].min())
-    # print("uv_a_tuple[1].max min: ", uv_a_tuple[1].max(), " ", uv_a_tuple[1].min())
   
-    # pdb.set_trace()
-    if (0):
-        # pdb.set_trace()
-        uv_a.shape
-        uv_b_matches.shape
-        uv_a_tuple[0].shape # (100000,1)
-        uv_a_tuple[1].shape # (100000,1)
-        non_matches_a.shape            
-    # pdb.set_trace()
     non_matches_a = tuple_to_1d(uv_a_tuple, Wc)
     non_matches_b = tuple_to_1d(uv_b_non_matches_tuple, Wc)
 
-    # print("non_mat_a shape: ", torch.unique(non_matches_a).shape)
-    # print("non_mat_b shape: ", torch.unique(non_matches_b).shape)
-    # print("non_matches_a max min: ", non_matches_a.max(), " ", non_matches_a.min())
-    # print("non_matches_b max min: ", non_matches_b.max(), " ", non_matches_b.min())
-    # print("image_a_pred: ", image_a_pred.shape)
-    # print("image_b_pred: ", image_b_pred.shape)
-    image_a_pred.shape
-
-    # pdb.set_trace()
     non_match_loss = get_non_match_loss(image_a_pred, image_b_pred, non_matches_a.to(device),
                                         non_matches_b.to(device), dist=dist)
-    # non_match_loss = non_match_loss.mean()
+
     # TODO: experiment on only match_loss
-    # loss = lamda_d * match_loss + non_match_loss
-    loss = non_match_loss
+    loss = lamda_d * match_loss + non_match_loss
     # print("loss: ", loss, " match_loss: ", match_loss, " nonMatLoss: ", non_match_loss)
     return loss, lamda_d * match_loss, non_match_loss
     pass

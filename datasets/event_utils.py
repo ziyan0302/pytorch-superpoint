@@ -114,6 +114,22 @@ def gen_discretized_event_volume(events, vol_size, device="cpu"):
     volume.view(-1).put_(inds_ce, vals_ce, accumulate=True)
     return volume
 
+def normalize_event_volume(event_volume):
+    event_volume_flat = event_volume.view(-1)
+    nonzero = torch.nonzero(event_volume_flat)
+    nonzero_values = event_volume_flat[nonzero]
+    if nonzero_values.shape[0]:
+        lower = torch.kthvalue(nonzero_values,
+                               max(int(0.02 * nonzero_values.shape[0]), 1),
+                               dim=0)[0][0]
+        upper = torch.kthvalue(nonzero_values,
+                               max(int(0.98 * nonzero_values.shape[0]), 1),
+                               dim=0)[0][0]
+        max_val = max(abs(lower), upper)
+        event_volume = torch.clamp(event_volume, -max_val, max_val)
+        event_volume /= max_val
+    return event_volume
+
 def create_update_xyt(x, y, t, dx, dy, dt, p, vol_size, device="cpu"):
     assert (x>=0).byte().all() 
     assert (x<vol_size[2]).byte().all()

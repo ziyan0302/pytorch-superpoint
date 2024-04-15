@@ -14,7 +14,7 @@ import h5py
 import pdb
 import sys
 sys.path.append("./datasets")
-from event_utils import gen_discretized_event_volume
+from event_utils import gen_discretized_event_volume, normalize_event_volume
 
 
 class Mvsec(data.Dataset):
@@ -145,6 +145,7 @@ class Mvsec(data.Dataset):
                                                         imageH,
                                                         imageW])
                 
+                event_volume = normalize_event_volume(event_volume)
                 self.data = event_volume
         
                 sequence_set = []
@@ -255,6 +256,7 @@ class Mvsec(data.Dataset):
             input.update({'warped_img': warped_img})
 
             # print('erosion_radius', self.config['warped_pair']['valid_border_margin'])
+            # pdb.set_trace()
             valid_mask = self.compute_valid_mask(torch.tensor([H, W]), inv_homography=inv_homography,
                         erosion_radius=self.config['warped_pair']['valid_border_margin'])  # can set to other value
             input.update({'warped_valid_mask': valid_mask})
