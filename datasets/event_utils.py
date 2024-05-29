@@ -277,3 +277,33 @@ if __name__ == "__main__":
         optimizer.step()
         optimizer.zero_grad()
         print(mean.item())
+
+
+def gen_event_images(event_volume, prefix, device="cuda", clamp_val=2., normalize_events=True, signed=True):
+    
+    if signed:
+        n_bins = int(event_volume.shape[1] / 2)
+        time_range = torch.tensor(np.linspace(0.1, 1, n_bins), dtype=torch.float32).to(device)
+        time_range = torch.reshape(time_range, (1, n_bins, 1, 1))
+        
+        pos_event_image = torch.sum(
+            event_volume[:, :n_bins, ...] * time_range / \
+            (torch.sum(event_volume[:, :n_bins, ...], dim=1, keepdim=True) + 1e-5),
+            dim=1, keepdim=True)
+        neg_event_image = torch.sum(
+            event_volume[:, n_bins:, ...] * time_range / \
+            (torch.sum(event_volume[:, n_bins:, ...], dim=1, keepdim=True) + 1e-5),
+            dim=1, keepdim=True)
+        event_time_image = (pos_event_image + neg_event_image) / 2.
+    else:
+        n_bins = event_volume.shape[1]
+        time_range = torch.tensor(np.linspace(0.1, 1, n_bins), dtype=torch.float32).to(device)
+        time_range = torch.reshape(time_range, (1, n_bins, 1, 1))
+
+        event_time_image = torch.sum(
+                event_volume[:, :, ...] * time_range / \
+                (torch.sum(event_volume[:, :, ...], dim=1, keepdim=True) + 1e-5),
+            dim=1, keepdim=True)
+
+    
+    return event_time_image

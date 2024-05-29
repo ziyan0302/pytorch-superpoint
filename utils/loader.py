@@ -42,7 +42,7 @@ def worker_init_fn(worker_id):
    np.random.seed(base_seed + worker_id)
 
 
-def dataLoader(config, dataset='syn', warp_input=False, train=True, val=True):
+def dataLoader(config, dataset='syn', warp_input=False, train=True, val=True, shuffle=True):
     import torchvision.transforms as transforms
     training_params = config.get('training', {})
     workers_train = training_params.get('workers_train', 1) # 16
@@ -79,8 +79,12 @@ def dataLoader(config, dataset='syn', warp_input=False, train=True, val=True):
         task = 'val',
         **config['data'],
     )
+    if shuffle == False:
+        batch_size = 1
+    else:
+        batch_size = config['model']['eval_batch_size']
     val_loader = torch.utils.data.DataLoader(
-        val_set, batch_size=config['model']['eval_batch_size'], shuffle=True,
+        val_set, batch_size= batch_size, shuffle=shuffle,
         pin_memory=True,
         num_workers=workers_val,
         worker_init_fn=worker_init_fn

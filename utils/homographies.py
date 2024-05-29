@@ -275,7 +275,7 @@ def scale_homography_torch(H, shape, shift=(-1,-1), dtype=torch.float32):
     trans = torch.tensor([[2./width, 0., shift[0]], [0., 2./height, shift[1]], [0., 0., 1.]], dtype=dtype)
     # print("torch.inverse(trans) ", torch.inverse(trans))
     # print("H: ", H)
-    H_tf = torch.inverse(trans) @ H @ trans
+    H_tf = torch.inverse(trans) @ H.cpu() @ trans
     return H_tf
 
 def scale_homography(H, shape, shift=(-1,-1)):

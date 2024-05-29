@@ -11,9 +11,15 @@ datasets/draw_star/
 datasets/draw_stripes/
 datasets/gaussian_noise/
 datasets/synthetic_shapes_v6/
+datasets/coco/
+datasets/mvsec_dataset/
+model_bank/
+./*.txt
 logs/
-tmp.jpg
+lightning_logs/
+tb_logs/
 output.txt
-nohup.out
+nohup*
+tmpnohup*
 test.py
 *.jpg

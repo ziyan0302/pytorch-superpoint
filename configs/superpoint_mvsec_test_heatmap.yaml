@@ -53,8 +53,8 @@ data:
 front_end_model: 'Train_model_heatmap_mvsec'  # 'Train_model_frontend'
 
 training:
-    workers_train: 1 #16
-    workers_val: 1 #2
+    workers_train: 0 #16
+    workers_val: 0 #2
 
 model:
     # name: 'magic_point'
@@ -89,7 +89,7 @@ model:
     # pretrained: '/home/ziyan/02_research/pytorch-superpoint/logs/superpoint_mvsec/checkpoints/superPointNet_3600_checkpoint.pth.tar'
     # pretrained: "/home/ziyan/02_research/pytorch-superpoint/logs/superpoint_mvsec/2024-04-26_02-20/checkpoints/superPointNet_200_checkpoint.pth.tar"
     # pretrained: "/home/ziyan/02_research/pytorch-superpoint/logs/superpoint_mvsec/2024-04-26_01-10/checkpoints/superPointNet_6000_checkpoint.pth.tar"
-    pretrained: "/home/ziyan/02_research/pytorch-superpoint/logs/superpoint_mvsec/2024-04-30_12-45/checkpoints/superPointNet_4000_checkpoint.pth.tar"
+    pretrained: "/home/ziyan/02_research/pytorch-superpoint/logs/superpoint_mvsec/2024-05-09_05-36/checkpoints/superPointNet_4000_checkpoint.pth.tar"
     # subpixel:
         # enable: false
         # params:
@@ -99,12 +99,13 @@ model:
 
 retrain: True # set true for new model
 reset_iter: True # set true to set the iteration number to 0
-train_iter: 8000 # 4000 # 170000
+train_iter: 4000 # 170000
 validation_interval: 500 # 2000
 tensorboard_interval: 200 # 200
 save_interval: 1000 # 2000
 validation_size: 5
 
+pretrained: 
 
 
 

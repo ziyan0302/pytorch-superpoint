@@ -3,6 +3,7 @@ import numpy as np
 import torch
 from pathlib import Path
 import torch.utils.data as data
+import os
 
 # from .base_dataset import BaseDataset
 from settings import DATA_PATH, EXPER_PATH
@@ -14,8 +15,16 @@ import h5py
 import pdb
 import sys
 sys.path.append("./datasets")
-from event_utils import gen_discretized_event_volume, normalize_event_volume
+from event_utils import gen_discretized_event_volume, normalize_event_volume, gen_event_images
+import random
 
+def concat(list_of_names):
+    all_datasets = []
+    for name in list_of_names:
+        one_dataset = Mvsec(name)
+        all_datasets.append(one_dataset)
+    dataset = torch.utils.data.ConcatDataset(all_datasets)
+    return dataset
 
 class Mvsec(data.Dataset):
     default_config = {
@@ -61,26 +70,51 @@ class Mvsec(data.Dataset):
         self.transforms = transform
         self.action = 'train' if task == 'train' else 'val'
 
-        # get files
-        self.file_path = Path(DATA_PATH, 'mvsec_dataset/outdoor_day1_data.hdf5')  # Update with your HDF5 file path
-        with h5py.File(self.file_path, 'r') as hf:
-            self.image_raw_ts = np.array(hf['davis']['left']['image_raw_ts'])
-            self.len = len(self.image_raw_ts)
-
-        if (0):
-            with h5py.File(self.file_path, 'r') as hf:
-                pdb.set_trace()
-                self.len
-                self.events_raw = np.array(hf['davis']['left']['events'][:1000])
-                tmp_events = hf['davis']['left']['events']
-                indices = (self.image_raw_ts[1] < tmp_events[:,2]) &  (tmp_events[:,2] < self.image_raw_ts[2])
-                events_within_bounds = tmp_events[indices]
-                events_within_bounds.shape
-                print("init")
-
-        
         self.init_var()
-        pass
+        # get files
+        dataset_info_path = self.config['dataset_info']
+        self.dataset_start_dict = {}
+        # Open the dataset_info text file and store dataset info
+        with open(dataset_info_path, 'r') as file:
+            for line in file:
+                path, start_time = line.strip().split()
+                datasetName = path.split('/')[-1].split('.')[0]
+                self.dataset_start_dict[datasetName] = {"path" : path, "start_time" : float(start_time) }
+        
+        self.dataset_root = Path(DATA_PATH, 'mvsec_dataset')
+        self.dataset_collection = {}
+        self.len = 0
+        startIdx = 0
+        self.dataset_names = []
+        self.dataset_startIdx = []
+        self.requiredEvents = 10000
+        for datasetName, data_info in self.dataset_start_dict.items():
+            self.dataset_startIdx.append(startIdx + self.len)
+            self.dataset_names.append(datasetName)
+            file_path = Path(self.dataset_root, data_info['path'])  # Update with your HDF5 file path
+            print("=========================")
+            print("file_file: ", file_path)
+            with h5py.File(file_path, 'r') as hf:
+                image_raw_ts = np.array(hf['davis']['left']['image_raw_ts'])
+                start_frame = int(data_info['start_time'] * (1/0.02189))
+                self.dataset_collection[datasetName] = {'start_frame' : start_frame, 'len' : (len(image_raw_ts) - start_frame)}
+                self.len += self.dataset_collection[datasetName]['len']
+            
+            img2events_folder = os.path.join(self.dataset_root, "mvsec_cache")
+            img2events_file = os.path.join(img2events_folder, f"{datasetName}.npy")
+            self.dataset_collection[datasetName]['cache_path'] = img2events_file
+            # img2events_file = os.path.join(DATA_PATH, "img2events.npy")
+            if not os.path.exists(img2events_file):
+                with h5py.File(file_path, 'r') as hf:
+                    # event_ts = hf['davis']['left']['events'][start_frame:, 2]   
+                    event_ts = hf['davis']['left']['events'][:, 2]   
+                    img2events = np.searchsorted(event_ts, image_raw_ts[start_frame:])
+                np.save(img2events_file, img2events)
+
+            else:
+                self.img2events = np.load(img2events_file)
+        
+
 
     def init_var(self):
         torch.set_default_tensor_type(torch.FloatTensor)
@@ -131,19 +165,110 @@ class Mvsec(data.Dataset):
             input_image = input_image.astype('float32') / 255.0
             return input_image
 
-        to_floatTensor = lambda x: torch.tensor(x).type(torch.FloatTensor)
+        dataset_idx = -1
+        for startIdx in self.dataset_startIdx:
+            if index < startIdx:
+                break
+            dataset_idx +=1 
+        self.dataset_startIdx
+        datasetName = self.dataset_names[dataset_idx]
+        data_info = self.dataset_start_dict[datasetName]
+        file_path = data_info['path']
+        start_frame = self.dataset_collection[datasetName]['start_frame']
+        img2events_file = self.dataset_collection[datasetName]['cache_path']
+        index = index - self.dataset_startIdx[dataset_idx]
 
-        with h5py.File(self.file_path, 'r') as hf:
+        with h5py.File(Path(self.dataset_root,file_path), 'r') as hf:
             events_raw = hf['davis']['left']['events']
-            if (index < self.len - 1):
-                indices = (self.image_raw_ts[index] < events_raw[:,2]) &  (events_raw[:,2] < self.image_raw_ts[index+1])
-                events_within_bounds = events_raw[indices]
+            self.img2events = np.load(img2events_file)
+
+            if (0): # claude's modification
+                start = self.img2events[index]
+                end = self.img2events[index + 1]
+                new_start = np.random.randint(start, end - self.requiredEvents)
+                new_end = new_start + self.requiredEvents
+                events_within_bounds = events_raw[new_start:new_end, :]
+
+            if (1): # ziyan's modification
+                event_start = self.img2events[index]-1
+                event_end = event_start + self.requiredEvents
+                events_within_bounds = events_raw[event_start:event_end, :]
+                ##TODO: can not avoid too few events with in bound at the end of each dataset
+                imageN, imageH, imageW = hf['davis']['left']['image_raw'].shape
+                self.raw_image = hf['davis']['left']['image_raw'][index+start_frame]
+                event_volume = gen_discretized_event_volume(torch.tensor(events_within_bounds).cpu(),
+                                                        [self.flow_time_bins*2,
+                                                        imageH,
+                                                        imageW])
+                # print("events_within_bounds: ", events_within_bounds.shape)
+                # pdb.set_trace()
+                
+                event_volume = normalize_event_volume(event_volume)
+                self.data = event_volume
+                # pdb.set_trace()
+                if (0):
+                    event_volume.shape
+                    event_img = gen_event_images(event_volume.unsqueeze(0).type(torch.float32), prefix=None, device='cpu').squeeze()
+                    import cv2
+                    image_raw_ts = np.array(hf['davis']['left']['image_raw_ts'])
+                    image_raw_ts[index+start_frame]
+                    event_ts = hf['davis']['left']['events'][:, 2]   
+                    image_raw_ts[index+start_frame] - event_ts[event_start-2]
+                    len(hf['davis']['left']['image_raw'])
+                    cv2.imwrite("tmp.jpg", hf['davis']['left']['image_raw'][index+start_frame])
+                    cv2.imwrite("tmp.jpg", (event_img*255).numpy())
+
+        
+        
+
+                
+
+                
+
+            if (0):
+                tmp = [self.img2events[1:] - self.img2events[:-1]]
+                tmp
+                events_raw.shape
+                event_ts = hf['davis']['left']['events'][:, 2]
+                len(hf['davis']['left']['events'])
+                image_raw_ts[0] - event_ts[self.img2events[0]+1]
+                event_ts[59] - event_ts[0]
+                image_raw_ts[1] - image_raw_ts[0]
+                event_start = self.img2events[-1]
+                len(event_ts) - self.img2events[-1]
+                event_end = event_start + self.requiredEvents
+                event_end = start + self.requiredEvents
+                len(events_raw)
+                events_within_bounds = events_raw[event_start:event_end, :]
+                events_within_bounds.shape
+
+                image_raw_ts = np.array(hf['davis']['left']['image_raw_ts'])[137:]
+                image_raw_ts.shape
+
+
+            if (0):
+
+                if not (index < (self.dataset_collection[datasetName]['len'] - self.requiredEvents)):
+                    index = random.randint(0, (self.dataset_collection[datasetName]['len'] - self.requiredEvents))
+                # indices = (self.image_raw_ts[index] < events_raw[:,2]) &  (events_raw[:,2] < self.image_raw_ts[index+1])
+                # events_within_bounds = events_raw[indices]
+            
+                self.img2events = np.load(img2events_file)
+
+
+                start = self.img2events[index]
+                # end = self.img2events[index + 1]
+                end = start + self.requiredEvents
+                events_within_bounds = events_raw[start:end, :]
+
                 imageN, imageH, imageW = hf['davis']['left']['image_raw'].shape
                 self.raw_image = hf['davis']['left']['image_raw'][index]
                 event_volume = gen_discretized_event_volume(torch.tensor(events_within_bounds).cpu(),
                                                         [self.flow_time_bins*2,
                                                         imageH,
                                                         imageW])
+                # print("events_within_bounds: ", events_within_bounds.shape)
+                # pdb.set_trace()
                 
                 event_volume = normalize_event_volume(event_volume)
                 self.data = event_volume

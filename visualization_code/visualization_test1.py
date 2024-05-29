@@ -1,3 +1,10 @@
+"""
+Visaulization code:
+1. Find the corner points in image and warped image
+2. Extract description for corner points on image and those on warped image
+3. indexize the corner points on image
+4. find the most similar point on warped image
+"""
 import pdb
 import numpy as np
 import torch

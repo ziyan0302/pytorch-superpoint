@@ -137,7 +137,7 @@ def descriptor_loss_sparse(descriptors, descriptors_warped, homographies, img, m
 
     def findInterestPoints(img, blockSize=2, ksize=1, k=0.1):
         img_mean = torch.mean(img, dim=1)
-        result = torch.where(img_mean > 0, torch.tensor(1), torch.tensor(0)).numpy()[0]
+        result = torch.where(img_mean > 0, torch.tensor(1), torch.tensor(0)).cpu().numpy()[0]
         # Apply Harris corner detection
         # Adjust the parameter k to control sensitivity to corners
         # You may need to experiment with different values of k

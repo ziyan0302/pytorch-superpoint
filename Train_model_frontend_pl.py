@@ -26,8 +26,13 @@ from utils.utils import precisionRecall_torch
 from utils.utils import save_checkpoint
 
 from pathlib import Path
-import cv2
 import pdb
+import pytorch_lightning as pl
+
+from pytorch_lightning.loggers.logger import Logger
+from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
+
+
 
 
 def thd_img(img, thd=0.015):
@@ -55,7 +60,7 @@ def img_overlap(img_r, img_g, img_gray):  # img_b repeat
     return img
 
 
-class Train_model_frontend(object):
+class Train_model_frontend_pl(object):
     """
     # This is the base class for training classes. Wrap pytorch net to help training process.
     
@@ -201,6 +206,7 @@ class Train_model_frontend(object):
         init or load optimizer
         :return:
         """
+        print("frontend pl loadmodel")
         model = self.config["model"]["name"]
         params = self.config["model"]["params"]
         print("model: ", model)
@@ -272,6 +278,21 @@ class Train_model_frontend(object):
         print("set train loader")
         self._val_loader = loader
 
+
+    def train_pl(self, **options):
+        # train with pytorch lighting trainer
+        # training info
+        logging.info("n_iter: %d", self.n_iter)
+        logging.info("max_iter: %d", self.max_iter)
+        from models.SuperPointNet_gauss2_pl import SuperPointNet_gauss2_pl
+        superpointPL_model = SuperPointNet_gauss2_pl(config = self.config)
+        self.logger = TensorBoardLogger("tb_logs", name="my_model")
+        trainer = pl.Trainer(max_epochs=self.max_iter, logger=self.logger)
+        trainer.fit(superpointPL_model, 
+                    self.train_loader, 
+                    self.val_loader)
+    
+
     def train(self, **options):
         """
         # outer loop for training
@@ -289,6 +310,7 @@ class Train_model_frontend(object):
         while self.n_iter < self.max_iter:
             print("epoch: ", epoch)
             epoch += 1
+            
             for i, sample_train in tqdm(enumerate(self.train_loader)):
                 # train one sample
                 loss_out = self.train_val_sample(sample_train, self.n_iter, True)
@@ -641,7 +663,6 @@ class Train_model_frontend(object):
         :param name:
         :return:
         """
-        pdb.set_trace()
         if img_tensor.dim() == 4:
             for i in range(min(img_tensor.shape[0], 5)):
                 self.writer.add_image(
@@ -753,14 +774,15 @@ class Train_model_frontend(object):
             int - number of images
         :return:
         """
-        # import pdb
+        import pdb
         tb_imgs.keys()
         for element in list(tb_imgs):
             for idx in range(tb_imgs[element].shape[0]):
                 if idx >= max_img:
                     break
                 # print(f"element: {element}")
-                # tb_imgs[element][idx, ...].shape
+                # pdb.set_trace()
+                tb_imgs[element][idx, ...].shape
                 if element == 'image' or element == "warped_img":
                     continue
                 self.writer.add_image(

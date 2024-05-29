@@ -24,15 +24,10 @@ from utils.utils import precisionRecall_torch
 # from utils.utils import save_checkpoint
 
 from pathlib import Path
-from Train_model_frontend import Train_model_frontend
+from Train_model_frontend_pl import Train_model_frontend_pl
 import pdb
 from pytorch_lightning import LightningModule, Trainer
 import pytorch_lightning as pl
-from datasets.event_utils import gen_event_images
-import visualization_code.visualization_utils as vutil
-import cv2
-
-
 
 
 def thd_img(img, thd=0.015):
@@ -54,7 +49,7 @@ def img_overlap(img_r, img_g, img_gray):  # img_b repeat
     return img
 
 
-class Train_model_heatmap_mvsec(Train_model_frontend):
+class Train_model_heatmap_mvsec_pl(Train_model_frontend_pl):
     """ Wrapper around pytorch net to help with pre and post image processing. """
 
     """
@@ -214,8 +209,6 @@ class Train_model_heatmap_mvsec(Train_model_frontend):
 
         mask_desc = mask_3D_flattened.unsqueeze(1) # [1,1,40,30]
         lambda_loss = self.config["model"]["lambda_loss"]
-
-
         
         # descriptor loss
         if lambda_loss > 0:
@@ -267,57 +260,6 @@ class Train_model_heatmap_mvsec(Train_model_frontend):
             )
 
             self.printLosses(self.scalar_dict, task)
-
-
-            ## draw corresponding img
-            image_a_pred = coarse_desc[0].unsqueeze(0)
-            warped_a_pred = coarse_desc_warp[0].unsqueeze(0)
-            Hc, Wc = image_a_pred.shape[2], image_a_pred.shape[3]
-            img_shape = (Hc, Wc)
-
-            homographies_H = sample["homographies"][0]
-            homographies_H = vutil.scale_homography_torch(homographies_H, img_shape, shift=(-1, -1))
-
-
-            uv_a, uv_b, matches_a_descriptors, matches_b_descriptors = vutil.img2descAndWarpedDesc(image_a_pred, warped_a_pred, img, homographies_H)
-
-            input_uv = vutil.uvListTransformer(uv_a, Wc, Hc)
-            pred_uv = vutil.uvListTransformer(uv_b, Wc, Hc)
-
-            # Compute distances between descriptors
-            distances_matrix = vutil.compute_distances(matches_a_descriptors.cpu().detach().numpy(), matches_b_descriptors.cpu().detach().numpy())
-            column_index_with_smallest_value = np.argmax(distances_matrix, axis=1)
-            matches = []
-            import cv2
-            for row_index, col_index in enumerate(column_index_with_smallest_value):
-                # Create a cv2.DMatch object with query index as row_index, train index as col_index,
-                # and optionally set distance to 0
-                dmatch = cv2.DMatch(row_index, col_index, 0)
-                # Append the created dmatch to the list
-                matches.append(dmatch)
-
-            img1 = sample['raw_image'][0].squeeze().cpu().numpy()
-            img2 = sample['warped_rawImg'][0].squeeze().cpu().numpy()
-            out1 = cv2.drawKeypoints(img1, input_uv, None)
-            out2 = cv2.drawKeypoints(out1, pred_uv, None)
-        
-            points1 = np.float32([input_uv[match.queryIdx].pt for match in matches])
-            points2 = np.float32([pred_uv[match.trainIdx].pt for match in matches])
-            for pt1, pt2 in zip(points1, points2): 
-                pt1 = tuple(map(int, pt1))  # Convert to integer coordinates
-                pt2 = tuple(map(int, pt2))  # Convert to integer coordinates
-                cv2.line(out2, pt1, pt2, (0, 255, 0), 2)  # Draw a line from pt1 to pt2
-            out2_numpy = cv2.cvtColor(out2, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
-            out2_numpy = np.transpose(out2_numpy, (2, 0, 1))  # Convert HWC to CHW
-            # Convert NumPy array to tensor
-            out2_tensor = torch.tensor(out2_numpy, dtype=torch.uint8)
-            self.images_dict['matched_result'] = out2_tensor.unsqueeze(0)
-            self.images_dict['raw_image'] = torch.tensor(img1, dtype=torch.uint8).unsqueeze(0).unsqueeze(0)
-            self.images_dict['raw_warpedimage'] = torch.tensor(img2, dtype=torch.uint8).unsqueeze(0).unsqueeze(0)
-    
-            ## add event_img to tf
-            event_img = gen_event_images(sample['image'][2].unsqueeze(0).type(torch.float32), prefix=None, device='cpu').squeeze()
-            self.images_dict['event_volume'] = event_img.unsqueeze(0).unsqueeze(0)
             self.tb_images_dict(task, self.images_dict, max_img=2)
             self.tb_hist_dict(task, self.hist_dict)
 

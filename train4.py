@@ -13,6 +13,8 @@ import logging
 import torch
 import torch.optim
 import torch.utils.data
+import pdb
+
 
 from tensorboardX import SummaryWriter
 
@@ -24,6 +26,11 @@ from settings import EXPER_PATH
 from utils.loader import dataLoader, modelLoader, pretrainedLoader
 from utils.logging import *
 # from models.model_wrap import SuperPointFrontend_torch, PointTracker
+
+from pytorch_lightning.loggers.logger import Logger
+from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
+import datetime
+
 
 ###### util functions ######
 def datasize(train_loader, config, tag='train'):
@@ -61,7 +68,10 @@ def train_joint(config, output_dir, args):
     writer = SummaryWriter(getWriterPath(task=args.command, 
         exper_name=args.exper_name, date=True))
     ## save data
-    save_path = get_save_path(output_dir)
+    current_datetime = datetime.datetime.now()
+    formatted_datetime = current_datetime.strftime("%Y-%m-%d_%H-%M")
+    save_path = output_dir + "/" + formatted_datetime
+    save_path = get_save_path(save_path)
 
     # data loading
     # data = dataLoader(config, dataset='syn', warp_input=True)
@@ -73,28 +83,44 @@ def train_joint(config, output_dir, args):
     # init the training agent using config file
     # from train_model_frontend import Train_model_frontend
     from utils.loader import get_module
-    train_model_frontend = get_module('', config['front_end_model'])
 
-    train_agent = train_model_frontend(config, save_path=save_path, device=device)
+    if (1):
+        train_model_frontend = get_module('', config['front_end_model'])
+        train_agent = train_model_frontend(config, save_path=save_path, device=device)
+        # writer from tensorboard
+        train_agent.writer = writer
 
-    # writer from tensorboard
-    train_agent.writer = writer
+        # feed the data into the agent
+        train_agent.train_loader = train_loader
+        train_agent.val_loader = val_loader
 
-    # feed the data into the agent
-    train_agent.train_loader = train_loader
-    train_agent.val_loader = val_loader
+        # load model initiates the model and load the pretrained model (if any)
+        train_agent.loadModel()
+        train_agent.dataParallel()
 
-    # load model initiates the model and load the pretrained model (if any)
-    train_agent.loadModel()
-    train_agent.dataParallel()
+        try:
+            # train function takes care of training and evaluation
+            train_agent.train()
 
-    try:
-        # train function takes care of training and evaluation
-        train_agent.train()
-    except KeyboardInterrupt:
-        print ("press ctrl + c, save model!")
-        train_agent.saveModel()
+        except KeyboardInterrupt:
+            print ("press ctrl + c, save model!")
+            train_agent.saveModel()
+            pass
+    if (0):
+        train_model_frontend = get_module('', config['front_end_model'])
+        train_agent = train_model_frontend(config, save_path=save_path, device=device)
+        # writer from tensorboard
+        train_agent.writer = writer
+
+        # feed the data into the agent
+        train_agent.train_loader = train_loader
+        train_agent.val_loader = val_loader
+
+        train_agent.loadModel()
+        
+        train_agent.train_pl()
         pass
+
 
 if __name__ == '__main__':
     # global var
