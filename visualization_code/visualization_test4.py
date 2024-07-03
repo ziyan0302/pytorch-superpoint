@@ -83,7 +83,7 @@ for index, sample in tqdm(enumerate(data_iter)):
         cv2.imwrite("subsequentEvents.jpg", canvas)
 
         time.sleep(0.5)
-    if (1): ## show warped image pair and event pair
+    if (0): ## show warped image pair and event pair
         for _ in range(skip_steps-1):
             next(data_iter)
         nextSample = next(data_iter)

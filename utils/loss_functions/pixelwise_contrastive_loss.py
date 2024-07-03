@@ -270,7 +270,9 @@ class PixelwiseContrastiveLoss(object):
         else:
             non_match_loss = (non_matches_a_descriptors - non_matches_b_descriptors).norm(norm_degree, 1)
         # print("non_match_loss: ", non_match_loss)
-        
+        # pdb.set_trace()
+        if (0):
+            tmp = non_match_loss.clone().detach()
         if not invert:
             non_match_loss = torch.clamp(M - non_match_loss, min=0).pow(2)
         else:
@@ -296,7 +298,6 @@ class PixelwiseContrastiveLoss(object):
         # print("debug3")
         num_hard_negatives = len(hard_negative_idxs)
         # import pdb
-        # pdb.set_trace()
 
         return non_match_loss, num_hard_negatives, non_matches_a_descriptors, non_matches_b_descriptors
 

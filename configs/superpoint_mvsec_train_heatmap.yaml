@@ -57,9 +57,8 @@ training:
     workers_val: 1 #2
 
 model:
-    # name: 'magic_point'
-    # name: 'SuperPointNet_heatmap'
-    name: 'SuperPointNet_gauss2'
+
+    name: 'SuperPointNet_gauss2event'
     params: {
     }
     detector_loss:
@@ -82,21 +81,13 @@ model:
         params:
             num_matching_attempts: 1000
             num_masked_non_matches_per_match: 100
-            lamda_d: 0.5
+            lamda_d: 1.0
             dist: 'cos'
             method: '2d'
+            pos_margin: 0.7
+            neg_margin: 0.1
+            pts_sample_rate: 2
     other_settings: 'train 2d, gauss 0.2'
-    # pretrained: '/home/ziyan/02_research/pytorch-superpoint/logs/superpoint_mvsec/checkpoints/superPointNet_3600_checkpoint.pth.tar'
-    # pretrained: "/home/ziyan/02_research/pytorch-superpoint/logs/superpoint_mvsec/2024-04-26_02-20/checkpoints/superPointNet_200_checkpoint.pth.tar"
-    # pretrained: "/home/ziyan/02_research/pytorch-superpoint/logs/superpoint_mvsec/2024-04-26_01-10/checkpoints/superPointNet_6000_checkpoint.pth.tar"
-    pretrained: "/home/ziyan/02_research/pytorch-superpoint/logs/superpoint_mvsec/2024-04-30_12-45/checkpoints/superPointNet_4000_checkpoint.pth.tar"
-    # subpixel:
-        # enable: false
-        # params:
-        #     subpixel_channel: 2
-        # settings: 'predict flow directly'
-        # loss_func: 'subpixel_loss_no_argmax' # subpixel_loss, subpixel_loss_no_argmax
-
 retrain: True # set true for new model
 reset_iter: True # set true to set the iteration number to 0
 train_iter: 8000 # 4000 # 170000

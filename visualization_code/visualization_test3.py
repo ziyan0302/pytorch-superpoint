@@ -130,6 +130,7 @@ for index, sample in tqdm(enumerate(data_iter)):
     for _ in range(skip_steps-1):
         next(data_iter)
     nextSample = next(data_iter)
+    
 
         
 
@@ -138,14 +139,37 @@ for index, sample in tqdm(enumerate(data_iter)):
     image_a_pred = coarse_desc
     nextImage_a_pred = nextCoarse_desc
 
+    # get the normed interest points and description
     uv_a, matches_a_descriptors = vutil.uv2descriptorExtractor(image_a_pred, img)
-    uv_aNext, matches_aNext_descriptors = vutil.uv2descriptorExtractor(nextImage_a_pred, nextImg)
-    if (1):
-        img.shape
-        pdb.set_trace()
-        sample['name']
-        nextSample['name']
+    pdb.set_trace()
     
+    if(0):
+
+        # Generate grid points
+        x = np.linspace(-1, 1, 100)
+        y = np.linspace(-1, 1, 100)
+
+        # Create meshgrid
+        X, Y = np.meshgrid(x, y)
+
+        idxs = np.arange(0,uv_a.shape[0],11)
+        tmp = uv_a[idxs]
+        tmp.shape
+
+    uv_aNext, matches_aNext_descriptors = vutil.uv2descriptorExtractor(nextImage_a_pred, nextImg)
+    
+    if (1): # randomly filter out some interest points
+        idxs_a = np.arange(0,uv_a.shape[0],11)
+        uv_a = uv_a[idxs_a]
+        matches_a_descriptors = matches_a_descriptors[idxs_a]
+
+        idxs_next = np.arange(0,uv_aNext.shape[0],11)
+        uv_aNext = uv_aNext[idxs_next]
+        matches_aNext_descriptors = matches_aNext_descriptors[idxs_next]
+
+
+        
+
     Hc, Wc = image_a_pred.shape[2], image_a_pred.shape[3]
     img_shape = (Hc, Wc)
 
@@ -190,10 +214,15 @@ for index, sample in tqdm(enumerate(data_iter)):
 
         cv2.imwrite("img3.jpg", img3)
 
-    if (1): ## show event volume visualization
+    if (0): ## show event volume visualization
         event_img = gen_event_images(sample['image'].type(torch.float32), prefix=None, device='cpu').squeeze()
         cv2.imwrite("event.jpg", (event_img*255).numpy())
         time.sleep(0.1)
+
+    if (1): # show interest points only
+        out1 = cv2.drawKeypoints(img2, input_uv, None)
+        cv2.imwrite("img1.jpg", out1)
+         
 
     if (1): ## draw lines for matched points on the same image
         out1 = cv2.drawKeypoints(img2, input_uv, None)

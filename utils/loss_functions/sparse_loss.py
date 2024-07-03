@@ -60,7 +60,10 @@ def create_non_matches(uv_a, uv_b_non_matches, multiplier):
 def descriptor_loss_sparse(descriptors, descriptors_warped, homographies, img, mask_valid=None,
                            cell_size=8, device='cpu', descriptor_dist=4, lamda_d=250,
                            num_matching_attempts=1000, num_masked_non_matches_per_match=10, 
-                           dist='cos', method='1d', **config):
+                           dist='cos', method='1d', 
+                           pos_margin=1.0, neg_margin=0.2,
+                           pts_sample_rate = 11,
+                             **config):
     """
     consider batches of descriptors
     :param descriptors:
@@ -97,7 +100,7 @@ def descriptor_loss_sparse(descriptors, descriptors_warped, homographies, img, m
     def get_match_loss(image_a_pred, image_b_pred, matches_a, matches_b, dist='cos', method='1d'):
         match_loss, matches_a_descriptors, matches_b_descriptors = \
             PixelwiseContrastiveLoss.match_loss(image_a_pred, image_b_pred, 
-                matches_a, matches_b, dist=dist, method=method)
+                matches_a, matches_b, dist=dist, method=method, M = pos_margin)
         return match_loss
 
     def get_non_matches_corr(img_b_shape, uv_a, uv_b_matches, num_masked_non_matches_per_match=10, device='cpu'):
@@ -114,9 +117,9 @@ def descriptor_loss_sparse(descriptors, descriptors_warped, homographies, img, m
         # print("uv_a: ", uv_to_tuple(uv_a))
         # print("uv_b_non_matches: ", uv_b_non_matches)
         #     print("uv_b_non_matches: ", tensorUv2tuple(uv_b_non_matches))
-        uv_b_non_matches_tuple[0].shape
-        uv_b_matches.shape
-        uv_a.shape
+        # uv_b_non_matches_tuple[0].shape
+        # uv_b_matches.shape
+        # uv_a.shape
         tmp = uv_to_tuple(uv_a)
         tmp[0].shape
         uv_a_long = (torch.t(tmp[0].repeat(100, 1)).contiguous().view(-1, 1), torch.t(tmp[1].repeat(100, 1)).contiguous().view(-1, 1))
@@ -131,7 +134,7 @@ def descriptor_loss_sparse(descriptors, descriptors_warped, homographies, img, m
             PixelwiseContrastiveLoss.non_match_descriptor_loss(image_a_pred, image_b_pred,
                                                                non_matches_a.long().squeeze(),
                                                                non_matches_b.long().squeeze(),
-                                                               M=0.2, invert=True, dist=dist)
+                                                               M=neg_margin, invert=True, dist=dist)
         non_match_loss = non_match_loss.sum()/(num_hard_negatives + 1)
         return non_match_loss
 
@@ -145,7 +148,7 @@ def descriptor_loss_sparse(descriptors, descriptors_warped, homographies, img, m
         dst.max()
         # Threshold the response to highlight corners
         # You may need to adjust the threshold value according to your image
-        threshold = 0.01 * dst.max()
+        threshold = 0.02 * dst.max()
         # Find coordinates where dst exceeds the threshold
         coordinates = np.argwhere(dst > threshold)
         # make uv to be in [0,1]
@@ -168,11 +171,14 @@ def descriptor_loss_sparse(descriptors, descriptors_warped, homographies, img, m
     image_b_pred = descriptor_reshape(descriptors_warped)  # torch [batch_size, H*W, D]
 
     # matches
-    uv_a = get_coor_cells(Hc, Wc, cell_size, uv=True, device='cpu')
+    # uv_a = get_coor_cells(Hc, Wc, cell_size, uv=True, device='cpu')
     if (1):
+        # finding interest points on event img
         uv_a = findInterestPoints(img, blockSize=2, ksize=1, k=0.1)
+        idxs_a = np.arange(0,uv_a.shape[0],pts_sample_rate)
+        uv_a = uv_a[idxs_a]
         uv_a = uv_a * np.array([Hc-1, Wc-1])
-        
+
         uv_a[:,0], uv_a[:,1] = uv_a[:,1].copy(), uv_a[:,0].copy()  
         # pdb.set_trace()
         uv_a = torch.from_numpy(uv_a).float()

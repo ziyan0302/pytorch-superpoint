@@ -21,7 +21,7 @@ from utils.loader import dataLoader as dataLoader
 import torch.nn.functional as F
 import cv2
 from utils.utils import normPts
-from utils.utils import filter_points
+from utils.utils import filter_points, filter_points_np
 from datasets.event_utils import gen_event_images
 
 
@@ -35,7 +35,7 @@ def findInterestPoints(img, blockSize=2, ksize=1, k=0.1):
     dst.max()
     # Threshold the response to highlight corners
     # You may need to adjust the threshold value according to your image
-    threshold = 0.1 * dst.max()
+    threshold = 0.01 * dst.max()
     # Find coordinates where dst exceeds the threshold
     coordinates = np.argwhere(dst > threshold)
     # make uv to be in [0,1]
@@ -167,6 +167,18 @@ def compute_distances(descriptors_a, descriptors_b):
     distances = np.dot(descriptors_a, descriptors_b.T)
     return distances
 
+def find_most_similar_pairs(similarity_matrix):
+    list1_to_list2 = similarity_matrix.argmax(axis=1)
+    list2_to_list1 = similarity_matrix.argmax(axis=0)
+    return list1_to_list2, list2_to_list1
+
+def find_bidirectional_matches(list1_to_list2, list2_to_list1):
+    bidirectional_matches = []
+    for i, j in enumerate(list1_to_list2):
+        if list2_to_list1[j] == i:
+            bidirectional_matches.append((i, j))
+    return bidirectional_matches
+
 def uvListTransformer(uv_a, Wc, Hc):
     input_uv = []
     for i in range(uv_a.squeeze().shape[0]):
@@ -212,3 +224,59 @@ def warp_coor_cells_with_homographies(coor_cells, homographies, uv=False, device
     # warped_coor_mask = denormPts(warped_coor_cells, shape_cell)
 
     return warped_coor_cells
+
+def draw_corresponding(img2, input_uv, pred_uv, matches, color=(255, 255, 0)):
+    out1 = cv2.drawKeypoints(img2, input_uv, None)
+    out2 = cv2.drawKeypoints(out1, pred_uv, None)
+    points1 = np.float32([input_uv[match.queryIdx].pt for match in matches])
+    points2 = np.float32([pred_uv[match.trainIdx].pt for match in matches])
+    for pt1, pt2 in zip(points1, points2): 
+        pt1 = tuple(map(int, pt1))  # Convert to integer coordinates
+        pt2 = tuple(map(int, pt2))  # Convert to integer coordinates
+        # cv2.line(out2, pt1, pt2, (0, 255, 0), 2)  # Draw a line from pt1 to pt2
+        line_length = int(np.linalg.norm(np.array(pt1) - np.array(pt2)))
+        # tipLength = arrow_tip_length/line_length
+        cv2.arrowedLine(out2, pt1, pt2, color, thickness=2, tipLength=0.05)
+    return out2
+
+def draw_corresponding2(out2, uvList1, uvList2, color=(255, 255, 0)):
+    for pt1, pt2 in zip(uvList1, uvList2): 
+        pt1 = tuple(map(int, pt1))  # Convert to integer coordinates
+        pt2 = tuple(map(int, pt2))  # Convert to integer coordinates
+        # cv2.line(out2, pt1, pt2, (0, 255, 0), 2)  # Draw a line from pt1 to pt2
+        line_length = int(np.linalg.norm(np.array(pt1) - np.array(pt2)))
+        # tipLength = arrow_tip_length/line_length
+        cv2.arrowedLine(out2, pt1, pt2, color, thickness=2, tipLength=0.05)
+
+def estimate_HandPts(input_uv, pred_uv, matches, Wc, Hc):
+
+    points1 = np.float32([input_uv[match.queryIdx].pt for match in matches])
+    points2 = np.float32([pred_uv[match.trainIdx].pt for match in matches])
+    points1 /= 8 
+    points2 /= 8 
+    H, inliers = cv2.findHomography(points1,
+                                    points2,
+                                    cv2.RANSAC)
+    points = np.concatenate([points1, np.ones(len(points1))[:,np.newaxis]], axis=1)
+    homo_pts = np.dot(points, H.T)
+    homo_pts = homo_pts/homo_pts[:,2][:, np.newaxis]
+
+    # homo_pts, mask = filter_points_np(homo_pts[:,:2], np.array([Wc*8, Hc*8]), return_mask=True)
+    homo_pts, mask = filter_points_np(homo_pts[:,:2], np.array([Wc, Hc]), return_mask=True)
+    homo_pts *= 8
+    befH_pts = points1[mask]*8 # then filter out uv_a (points before warpped)
+    
+    return H, befH_pts, homo_pts
+
+def compute_matches(matches_a_descriptors, matches_b_descriptors, matches):
+    distances_matrix = compute_distances(matches_a_descriptors.cpu().numpy(), matches_b_descriptors.cpu().numpy())
+    # check bidirectionally and find the most similar pairs
+    column_index_with_smallest_value, row_index_with_smallest_value = find_most_similar_pairs(distances_matrix)
+    
+    bidirectional_matches = find_bidirectional_matches(column_index_with_smallest_value, row_index_with_smallest_value)
+    for row_index, col_index in bidirectional_matches:
+        # Create a cv2.DMatch object with query index as row_index, train index as col_index,
+        # and optionally set distance to 0
+        dmatch = cv2.DMatch(row_index, col_index, 0)
+        # Append the created dmatch to the list
+        matches.append(dmatch)

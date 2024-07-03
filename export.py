@@ -39,6 +39,7 @@ from utils.utils import getWriterPath
 from utils.loader import dataLoader, modelLoader, pretrainedLoader
 from utils.utils import inv_warp_image_batch
 from models.model_wrap import SuperPointFrontend_torch, PointTracker
+import sys
 
 ## parameters
 from settings import EXPER_PATH
@@ -370,6 +371,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command")
 
+
+    import pdb
+    
     # export command
     p_train = subparsers.add_parser("export_descriptor")
     p_train.add_argument("config", type=str)
@@ -396,8 +400,17 @@ if __name__ == "__main__":
     p_train.set_defaults(func=export_detector_homoAdapt_gpu)
 
     args = parser.parse_args()
+
+    # Debugging print
+    print("Parsed arguments:", args)
+
+    # Check if command is None
+    if args.command is None:
+        parser.print_help()
+        sys.exit(1)
+
     with open(args.config, "r") as f:
-        config = yaml.load(f)
+        config = yaml.safe_load(f)
     print("check config!! ", config)
 
     output_dir = os.path.join(EXPER_PATH, args.exper_name)

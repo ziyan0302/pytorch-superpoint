@@ -269,7 +269,7 @@ class Train_model_heatmap_mvsec(Train_model_frontend):
             self.printLosses(self.scalar_dict, task)
 
 
-            ## draw corresponding img
+            ## draw predicted corresponding pair of interest points  
             image_a_pred = coarse_desc[0].unsqueeze(0)
             warped_a_pred = coarse_desc_warp[0].unsqueeze(0)
             Hc, Wc = image_a_pred.shape[2], image_a_pred.shape[3]
@@ -278,13 +278,16 @@ class Train_model_heatmap_mvsec(Train_model_frontend):
             homographies_H = sample["homographies"][0]
             homographies_H = vutil.scale_homography_torch(homographies_H, img_shape, shift=(-1, -1))
 
-
+            # get uva and warped uvb, the predicted description got by uva and predicted description got by uvb
+            # the length of uva and uvb is the same 
             uv_a, uv_b, matches_a_descriptors, matches_b_descriptors = vutil.img2descAndWarpedDesc(image_a_pred, warped_a_pred, img, homographies_H)
 
+            # turn the pts to pixel coordinate
             input_uv = vutil.uvListTransformer(uv_a, Wc, Hc)
             pred_uv = vutil.uvListTransformer(uv_b, Wc, Hc)
 
-            # Compute distances between descriptors
+            # Compute distances between descriptions
+            # for each query idx, find the target idx with largest similarity
             distances_matrix = vutil.compute_distances(matches_a_descriptors.cpu().detach().numpy(), matches_b_descriptors.cpu().detach().numpy())
             column_index_with_smallest_value = np.argmax(distances_matrix, axis=1)
             matches = []
@@ -306,7 +309,9 @@ class Train_model_heatmap_mvsec(Train_model_frontend):
             for pt1, pt2 in zip(points1, points2): 
                 pt1 = tuple(map(int, pt1))  # Convert to integer coordinates
                 pt2 = tuple(map(int, pt2))  # Convert to integer coordinates
-                cv2.line(out2, pt1, pt2, (0, 255, 0), 2)  # Draw a line from pt1 to pt2
+                # cv2.line(out2, pt1, pt2, (0, 255, 0), 2)  # Draw a line from pt1 to pt2
+                cv2.arrowedLine(out2, pt1, pt2, (0, 255, 0), thickness=2, tipLength=0.05)
+
             out2_numpy = cv2.cvtColor(out2, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
             out2_numpy = np.transpose(out2_numpy, (2, 0, 1))  # Convert HWC to CHW
             # Convert NumPy array to tensor

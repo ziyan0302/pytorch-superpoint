@@ -283,6 +283,17 @@ def filter_points(points, shape, return_mask=False):
     return points [mask]
     # return points [torch.prod(mask, dim=-1) == 1]
 
+def filter_points_np(points, shape, return_mask=False):
+    ### check!
+    points = points
+    shape = shape
+    mask = (points >= 0) * (points <= shape-1)
+    mask = (np.prod(mask, axis=-1) == 1)
+    if return_mask:
+        return points[mask], mask
+    return points [mask]
+
+
 def warp_points(points, homographies, device='cpu'):
     """
     Warp a list of points with the given homography.

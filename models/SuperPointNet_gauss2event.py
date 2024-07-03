@@ -9,14 +9,14 @@ from models.unet_parts import *
 import numpy as np
 
 # from models.SubpixelNet import SubpixelNet
-class SuperPointNet_gauss2(torch.nn.Module):
+class SuperPointNet_gauss2event(torch.nn.Module):
     """ Pytorch definition of SuperPoint Network. """
     def __init__(self, subpixel_channel=1):
-        super(SuperPointNet_gauss2, self).__init__()
+        super(SuperPointNet_gauss2event, self).__init__()
         c1, c2, c3, c4, c5, d1 = 64, 64, 128, 128, 256, 256
         det_h = 65
-        self.inc = inconv(1, c1)
-        # self.inc = inconv(18, c1)
+        # self.inc = inconv(1, c1)
+        self.inc = inconv(18, c1)
         self.down1 = down(c1, c2)
         self.down2 = down(c2, c3)
         self.down3 = down(c3, c4)

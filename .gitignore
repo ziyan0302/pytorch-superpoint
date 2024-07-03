@@ -12,6 +12,7 @@ datasets/draw_stripes/
 datasets/gaussian_noise/
 datasets/synthetic_shapes_v6/
 datasets/coco/
+datasets/COCO/
 datasets/mvsec_dataset/
 model_bank/
 ./*.txt

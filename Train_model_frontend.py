@@ -114,6 +114,7 @@ class Train_model_frontend(object):
             self.desc_params = self.config["model"]["sparse_loss"]["params"]
             from utils.loss_functions.sparse_loss import batch_descriptor_loss_sparse
 
+
             self.descriptor_loss = batch_descriptor_loss_sparse
             self.desc_loss_type = "sparse"
 

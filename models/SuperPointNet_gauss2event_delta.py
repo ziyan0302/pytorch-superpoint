@@ -9,14 +9,14 @@ from models.unet_parts import *
 import numpy as np
 
 # from models.SubpixelNet import SubpixelNet
-class SuperPointNet_gauss2(torch.nn.Module):
+class SuperPointNet_gauss2event_delta(torch.nn.Module):
     """ Pytorch definition of SuperPoint Network. """
     def __init__(self, subpixel_channel=1):
-        super(SuperPointNet_gauss2, self).__init__()
+        super(SuperPointNet_gauss2event_delta, self).__init__()
         c1, c2, c3, c4, c5, d1 = 64, 64, 128, 128, 256, 256
         det_h = 65
-        self.inc = inconv(1, c1)
-        # self.inc = inconv(18, c1)
+        # self.inc = inconv(1, c1)
+        self.inc = inconv(18, c1)
         self.down1 = down(c1, c2)
         self.down2 = down(c2, c3)
         self.down3 = down(c3, c4)
@@ -37,6 +37,12 @@ class SuperPointNet_gauss2(torch.nn.Module):
         self.bnDa = nn.BatchNorm2d(c5)
         self.convDb = torch.nn.Conv2d(c5, d1, kernel_size=1, stride=1, padding=0)
         self.bnDb = nn.BatchNorm2d(d1)
+        # Offset Head.
+        self.convOa = torch.nn.Conv2d(c4, c5, kernel_size=3, stride=1, padding=1)
+        self.bnOa = nn.BatchNorm2d(c5)
+        self.convOb = torch.nn.Conv2d(c5, d1, kernel_size=1, stride=1, padding=0)
+        self.bnOb = nn.BatchNorm2d(d1)
+        
         self.output = None
 
 
@@ -62,10 +68,17 @@ class SuperPointNet_gauss2(torch.nn.Module):
         # Descriptor Head.
         cDa = self.relu(self.bnDa(self.convDa(x4)))
         desc = self.bnDb(self.convDb(cDa))
+        # Offset Head.
+        cOa = self.relu(self.bnOa(self.convOa(x4)))
+        offset = self.bnOb(self.convOb(cOa))
+        
 
         dn = torch.norm(desc, p=2, dim=1) # Compute the norm.
         desc = desc.div(torch.unsqueeze(dn, 1)) # Divide by norm to normalize.
-        output = {'semi': semi, 'desc': desc}
+        Offn = torch.norm(offset, p=2, dim=1) # Compute the norm.
+        offset = offset.div(torch.unsqueeze(Offn, 1)) # Divide by norm to normalize.
+        
+        output = {'semi': semi, 'desc': desc, "offset": offset}
         self.output = output
 
         return output
@@ -84,6 +97,7 @@ class SuperPointNet_gauss2(torch.nn.Module):
         output = self.output
         semi = output['semi']
         desc = output['desc']
+        offset = output['offset']
         # flatten
         heatmap = flattenDetection(semi) # [batch_size, 1, H, W]
         # nms
