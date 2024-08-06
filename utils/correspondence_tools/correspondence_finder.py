@@ -228,7 +228,8 @@ def create_non_correspondences(uv_b_matches, img_b_shape, num_non_matches_per_ma
 
     def get_random_uv_b_non_matches():
         return pytorch_rand_select_pixel(width=image_width,height=image_height, 
-            num_samples=num_matches*num_non_matches_per_match)
+            num_samples=num_matches*num_non_matches_per_match) # w=43, h=32, n=1000*100
+    
 
     if img_b_mask is not None:
         img_b_mask_flat = img_b_mask.view(-1,1).squeeze(1)
@@ -252,31 +253,206 @@ def create_non_correspondences(uv_b_matches, img_b_shape, num_non_matches_per_ma
 
     # uv_b_matches can now be used to make sure no "non_matches" are too close
     # to preserve tensor size, rather than pruning, we can perturb these in pixel space
-    copied_uv_b_matches_0 = torch.t(uv_b_matches[0].repeat(num_non_matches_per_match, 1))
+    copied_uv_b_matches_0 = torch.t(uv_b_matches[0].repeat(num_non_matches_per_match, 1)) # (1000, 100)
     copied_uv_b_matches_1 = torch.t(uv_b_matches[1].repeat(num_non_matches_per_match, 1))
 
     diffs_0 = copied_uv_b_matches_0 - uv_b_non_matches[0].type(dtype_float)
     diffs_1 = copied_uv_b_matches_1 - uv_b_non_matches[1].type(dtype_float)
 
-    diffs_0_flattened = diffs_0.contiguous().view(-1,1)
+    diffs_0_flattened = diffs_0.contiguous().view(-1,1) # (100000)
     diffs_1_flattened = diffs_1.contiguous().view(-1,1)
 
     diffs_0_flattened = torch.abs(diffs_0_flattened).squeeze(1)
     diffs_1_flattened = torch.abs(diffs_1_flattened).squeeze(1)
 
-
     need_to_be_perturbed = torch.zeros_like(diffs_0_flattened)
-    ones = torch.zeros_like(diffs_0_flattened)
+    ## bug in the original repo
+    # ones = torch.zeros_like(diffs_0_flattened)
+    ones = torch.ones_like(diffs_0_flattened)
     num_pixels_too_close = 1.0
     threshold = torch.ones_like(diffs_0_flattened)*num_pixels_too_close
 
     # determine which pixels are too close to being matches
     need_to_be_perturbed = where(diffs_0_flattened < threshold, ones, need_to_be_perturbed)
     need_to_be_perturbed = where(diffs_1_flattened < threshold, ones, need_to_be_perturbed)
+    # torch.count_nonzero(need_to_be_perturbed) # the ratio is 5248/100000
 
     minimal_perturb        = num_pixels_too_close/2
     minimal_perturb_vector = (torch.rand(len(need_to_be_perturbed))*2).floor()*(minimal_perturb*2)-minimal_perturb
     std_dev = 10
+
+    random_vector = torch.randn(len(need_to_be_perturbed))*std_dev + minimal_perturb_vector
+    perturb_vector = need_to_be_perturbed*random_vector
+
+    uv_b_non_matches_0_flat = uv_b_non_matches[0].view(-1,1).type(dtype_float).squeeze(1)
+    uv_b_non_matches_1_flat = uv_b_non_matches[1].view(-1,1).type(dtype_float).squeeze(1)
+
+    uv_b_non_matches_0_flat = uv_b_non_matches_0_flat + perturb_vector
+    uv_b_non_matches_1_flat = uv_b_non_matches_1_flat + perturb_vector
+
+    # now just need to wrap around any that went out of bounds
+
+    # handle wrapping in width
+    lower_bound = 0.0
+    upper_bound = image_width*1.0 - 1
+    lower_bound_vec = torch.ones_like(uv_b_non_matches_0_flat) * lower_bound
+    upper_bound_vec = torch.ones_like(uv_b_non_matches_0_flat) * upper_bound
+
+    uv_b_non_matches_0_flat = where(uv_b_non_matches_0_flat > upper_bound_vec, 
+        uv_b_non_matches_0_flat - upper_bound_vec, 
+        uv_b_non_matches_0_flat)
+
+    uv_b_non_matches_0_flat = where(uv_b_non_matches_0_flat < lower_bound_vec, 
+        uv_b_non_matches_0_flat + upper_bound_vec, 
+        uv_b_non_matches_0_flat)
+
+    # handle wrapping in height
+    lower_bound = 0.0
+    upper_bound = image_height*1.0 - 1
+    lower_bound_vec = torch.ones_like(uv_b_non_matches_1_flat) * lower_bound
+    upper_bound_vec = torch.ones_like(uv_b_non_matches_1_flat) * upper_bound
+
+    while(any(uv_b_non_matches_1_flat > upper_bound_vec)):
+        uv_b_non_matches_1_flat = where(uv_b_non_matches_1_flat > upper_bound_vec, 
+            uv_b_non_matches_1_flat - upper_bound_vec, 
+            uv_b_non_matches_1_flat)
+    while(any(uv_b_non_matches_1_flat < lower_bound_vec)):
+        uv_b_non_matches_1_flat = where(uv_b_non_matches_1_flat < lower_bound_vec, 
+            uv_b_non_matches_1_flat + upper_bound_vec, 
+            uv_b_non_matches_1_flat)
+    # import pdb
+    # pdb.set_trace()
+    if (0):
+        print("uv_b_non_matches_0_flat: min, max: ", uv_b_non_matches_0_flat.min(), uv_b_non_matches_0_flat.max())
+        print("uv_b_non_matches_1_flat: min, max: ", uv_b_non_matches_1_flat.min(), uv_b_non_matches_1_flat.max())
+        any(uv_b_non_matches_1_flat < lower_bound_vec)
+        
+
+    return (uv_b_non_matches_0_flat.view(num_matches, num_non_matches_per_match),
+        uv_b_non_matches_1_flat.view(num_matches, num_non_matches_per_match))
+
+
+def create_non_matches_on_A_interest_pts(uv_a, choices,image_a_pred, \
+                                            non_matches_ptsOnA= 50):
+    import torch.nn.functional as F
+    
+    def sampleDescriptors(image_a_pred, matches_a, mode, norm=False):
+        image_a_pred = image_a_pred.unsqueeze(0) # torch [1, D, H, W]
+        matches_a.unsqueeze_(0).unsqueeze_(2)
+        matches_a_descriptors = F.grid_sample(image_a_pred, matches_a, mode=mode, align_corners=True)
+        matches_a_descriptors = matches_a_descriptors.squeeze().transpose(0,1)
+        # print("image_a_pred: ", image_a_pred.shape)
+        # print("matches_a: ", matches_a.shape)
+        # print("matches_a: ", matches_a)
+        # print("matches_a_descriptors: ", matches_a_descriptors)
+        if norm:
+            dn = torch.norm(matches_a_descriptors, p=2, dim=1) # Compute the norm of b_descriptors
+            matches_a_descriptors = matches_a_descriptors.div(torch.unsqueeze(dn, 1)) # Divide by norm to normalize.
+        return matches_a_descriptors
+    import pdb
+    pdb.set_trace()
+
+    matches_a_descriptors = sampleDescriptors(image_a_pred, uv_a_original.to("cuda"), 'bilinear')
+    
+    return 
+    
+
+def create_non_correspondences_focus_similar_interst_pts(uv_a, uv_b_matches, img_b_shape, 
+                                                         matches_a_descriptors, matches_b_descriptors,
+                                                         num_non_matches_per_match=100, img_b_mask=None):
+   
+    image_width  = img_b_shape[1]
+    image_height = img_b_shape[0]
+    # print("uv_b_matches: ", uv_b_matches)
+    if uv_b_matches == None:
+        return None
+
+    num_matches = len(uv_b_matches[0])
+
+    def get_random_uv_b_non_matches():
+        return pytorch_rand_select_pixel(width=image_width,height=image_height, 
+            num_samples=num_matches*num_non_matches_per_match) # w=43, h=32, n=1000*100
+    
+    def similar_interest_pts_non_matches(distances):
+        distances.shape
+        uv_b_non_matches = torch.empty()
+        for targetIdx in range(len(distances)): 
+            _ ,topkIdxs = torch.topk(distances[targetIdx], 20)
+            topkIdxs.tolist()
+            source_pos = torch.tensor([uv_b_matches[0][targetIdx], uv_b_matches[1][targetIdx]])
+            tmp_uvs = []
+            for u,v in zip(uv_b_matches[0][topkIdxs.cpu()], uv_b_matches[1][topkIdxs.cpu()]):tmp_uvs.append([u,v])
+            tmp_uvs = torch.tensor(tmp_uvs)
+            while source_pos in tmp_uvs:tmp_uvs.remove(source_pos)
+
+            # Remove source_pos if it exists in topk_uvs
+            mask = (tmp_uvs != source_pos).all(dim=1)
+            uv_b_non_match_for_1row = tmp_uvs[mask]
+
+        return uv_b_non_matches
+    
+    import pdb
+    pdb.set_trace()
+    matches_a_descriptors.shape
+    matches_b_descriptors.shape
+    uv_a.shape
+    uv_b_matches[1].shape
+
+    distances = torch.matmul(matches_a_descriptors.squeeze(), matches_b_descriptors.squeeze().T)
+    similar_non_matches = similar_interest_pts_non_matches(distances)
+
+
+
+    if img_b_mask is not None:
+        img_b_mask_flat = img_b_mask.view(-1,1).squeeze(1)
+        mask_b_indices_flat = torch.nonzero(img_b_mask_flat)
+        if len(mask_b_indices_flat) == 0:
+            print("warning, empty mask b")
+            uv_b_non_matches = get_random_uv_b_non_matches()
+        else:
+            num_samples = num_matches*num_non_matches_per_match
+            rand_numbers_b = torch.rand(num_samples)*len(mask_b_indices_flat)
+            rand_indices_b = torch.floor(rand_numbers_b).long()
+            randomized_mask_b_indices_flat = torch.index_select(mask_b_indices_flat, 0, rand_indices_b).squeeze(1)
+            uv_b_non_matches = (randomized_mask_b_indices_flat%image_width, randomized_mask_b_indices_flat/image_width)
+    else:
+        uv_b_non_matches = get_random_uv_b_non_matches()
+    
+    # for each in uv_a, we want non-matches
+    # first just randomly sample "non_matches"
+    # we will later move random samples that were too close to being matches
+    uv_b_non_matches = (uv_b_non_matches[0].view(num_matches,num_non_matches_per_match), uv_b_non_matches[1].view(num_matches,num_non_matches_per_match))
+
+    # uv_b_matches can now be used to make sure no "non_matches" are too close
+    # to preserve tensor size, rather than pruning, we can perturb these in pixel space
+    copied_uv_b_matches_0 = torch.t(uv_b_matches[0].repeat(num_non_matches_per_match, 1)) # (1000, 100)
+    copied_uv_b_matches_1 = torch.t(uv_b_matches[1].repeat(num_non_matches_per_match, 1))
+
+    diffs_0 = copied_uv_b_matches_0 - uv_b_non_matches[0].type(dtype_float)
+    diffs_1 = copied_uv_b_matches_1 - uv_b_non_matches[1].type(dtype_float)
+
+    diffs_0_flattened = diffs_0.contiguous().view(-1,1) # (100000)
+    diffs_1_flattened = diffs_1.contiguous().view(-1,1)
+
+    diffs_0_flattened = torch.abs(diffs_0_flattened).squeeze(1)
+    diffs_1_flattened = torch.abs(diffs_1_flattened).squeeze(1)
+
+    need_to_be_perturbed = torch.zeros_like(diffs_0_flattened)
+    ## bug in the original repo
+    # ones = torch.zeros_like(diffs_0_flattened)
+    ones = torch.ones_like(diffs_0_flattened)
+    num_pixels_too_close = 1.0
+    threshold = torch.ones_like(diffs_0_flattened)*num_pixels_too_close
+
+    # determine which pixels are too close to being matches
+    need_to_be_perturbed = where(diffs_0_flattened < threshold, ones, need_to_be_perturbed)
+    need_to_be_perturbed = where(diffs_1_flattened < threshold, ones, need_to_be_perturbed)
+    # torch.count_nonzero(need_to_be_perturbed) # the ratio is 5248/100000
+
+    minimal_perturb        = num_pixels_too_close/2
+    minimal_perturb_vector = (torch.rand(len(need_to_be_perturbed))*2).floor()*(minimal_perturb*2)-minimal_perturb
+    std_dev = 10
+
     random_vector = torch.randn(len(need_to_be_perturbed))*std_dev + minimal_perturb_vector
     perturb_vector = need_to_be_perturbed*random_vector
 
@@ -318,6 +494,8 @@ def create_non_correspondences(uv_b_matches, img_b_shape, num_non_matches_per_ma
 
     return (uv_b_non_matches_0_flat.view(num_matches, num_non_matches_per_match),
         uv_b_non_matches_1_flat.view(num_matches, num_non_matches_per_match))
+
+
 
 
 # Optionally, uv_a specifies the pixels in img_a for which to find matches

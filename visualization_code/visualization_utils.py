@@ -26,9 +26,12 @@ from datasets.event_utils import gen_event_images
 
 
 def findInterestPoints(img, blockSize=2, ksize=1, k=0.1):
-    img_mean = torch.mean(img, dim=1)
-    result = torch.where(img_mean > 0, torch.tensor(1), torch.tensor(0)).numpy()[0]
-    # Apply Harris corner detection
+    if img.shape[1] == 1:
+            result = img.squeeze(1).numpy().astype(np.uint8)[0]
+    else:
+        imgmean = img.mean(1)
+        result = torch.where(imgmean > 0, torch.tensor(1), torch.tensor(0)).cpu().numpy()[0]
+        # Apply Harris corner detection
     # Adjust the parameter k to control sensitivity to corners
     # You may need to experiment with different values of k
     dst = cv2.cornerHarris(np.uint8(result), blockSize, ksize, k)

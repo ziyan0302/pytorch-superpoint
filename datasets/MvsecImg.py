@@ -21,12 +21,12 @@ import random
 def concat(list_of_names):
     all_datasets = []
     for name in list_of_names:
-        one_dataset = Mvsec(name)
+        one_dataset = MvsecImg(name)
         all_datasets.append(one_dataset)
     dataset = torch.utils.data.ConcatDataset(all_datasets)
     return dataset
 
-class Mvsec(data.Dataset):
+class MvsecImg(data.Dataset):
     default_config = {
         'labels': None,
         'cache_in_memory': False,
@@ -217,8 +217,8 @@ class Mvsec(data.Dataset):
                 # print("events_within_bounds: ", events_within_bounds.shape)
                 
                 event_volume = normalize_event_volume(event_volume)
-                self.data = event_volume
-                # pdb.set_trace()
+                # Modification: data would be grey image of dataset
+                self.data = torch.from_numpy(self.raw_image).unsqueeze(0)
                 if (0): # show grey image or event image for check
                     event_volume.shape
                     event_img = gen_event_images(event_volume.unsqueeze(0).type(torch.float32), prefix=None, device='cpu').squeeze()

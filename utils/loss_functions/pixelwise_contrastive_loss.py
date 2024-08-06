@@ -158,6 +158,10 @@ class PixelwiseContrastiveLoss(object):
             def sampleDescriptors(image_a_pred, matches_a, mode, norm=False):
                 image_a_pred = image_a_pred.unsqueeze(0) # torch [1, D, H, W]
                 matches_a.unsqueeze_(0).unsqueeze_(2)
+                if (0):
+                    matches_a.shape
+                    image_a_pred.shape
+
                 matches_a_descriptors = F.grid_sample(image_a_pred, matches_a, mode=mode, align_corners=True)
                 matches_a_descriptors = matches_a_descriptors.squeeze().transpose(0,1)
                 
@@ -221,15 +225,40 @@ class PixelwiseContrastiveLoss(object):
         :return: torch.FloatTensor with shape torch.Shape([num_non_matches])
         :rtype:
         """
-        # print("non_matches_a.shape: ", non_matches_a.shape)
-        # print("non_matches_b.shape: ", non_matches_b.shape)
+        print("non_matches_a.shape: ", non_matches_a.shape)
+        print("non_matches_b.shape: ", non_matches_b.shape)
         # print("clamp non_matches_a to be max=image_a_pred.shape[1]")
         # non_matches_a.clamp_(max=image_a_pred.shape[1]-1)
-        # print("non_matches_a.min max: ", non_matches_a.min(), non_matches_a.max())
-        # print("non_matches_b.min max: ", non_matches_b.min(), non_matches_b.max())
+        print("non_matches_a.min max: ", non_matches_a.min(), non_matches_a.max())
+        print("non_matches_b.min max: ", non_matches_b.min(), non_matches_b.max())
         if (0):
+            # set non_matches to all zeros would pass without 
+            non_matches_a = torch.zeros_like(non_matches_a)
+            non_matches_b = torch.zeros_like(non_matches_b)
             tmp = torch.tensor([1364], device="cuda:0")
             torch.index_select(image_a_pred, 1, tmp).squeeze()
+            image_a_pred.shape
+            image_b_pred.shape
+            tmp = torch.zeros_like(non_matches_a)
+            non_matches_a_descriptors = torch.index_select(image_a_pred, 1, tmp).squeeze()
+            
+        # pdb.set_trace()
+
+        # Debug
+        # non_matches_a = torch.zeros_like(non_matches_a)
+        # non_matches_b = torch.zeros_like(non_matches_b)
+        # non_matches_a.max()
+        # non_matches_a.min()
+        # non_matches_b.max()
+        # non_matches_b.min()
+        # for mat in non_matches_a:
+        #     print("a: ", mat)
+        #     print(torch.index_select(image_a_pred, 1, mat).shape)
+        # for mat in non_matches_b:
+        #     print("b: ", mat)
+        #     print(torch.index_select(image_a_pred, 1, mat).shape)
+        
+
         non_matches_a_descriptors = torch.index_select(image_a_pred, 1, non_matches_a).squeeze()
         non_matches_b_descriptors = torch.index_select(image_b_pred, 1, non_matches_b).squeeze()
         # print("non_matches_a_descriptors.shape: ", non_matches_a_descriptors.shape)

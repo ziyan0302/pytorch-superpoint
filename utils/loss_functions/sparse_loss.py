@@ -101,7 +101,7 @@ def descriptor_loss_sparse(descriptors, descriptors_warped, homographies, img, m
         match_loss, matches_a_descriptors, matches_b_descriptors = \
             PixelwiseContrastiveLoss.match_loss(image_a_pred, image_b_pred, 
                 matches_a, matches_b, dist=dist, method=method, M = pos_margin)
-        return match_loss
+        return match_loss, matches_a_descriptors, matches_b_descriptors
 
     def get_non_matches_corr(img_b_shape, uv_a, uv_b_matches, num_masked_non_matches_per_match=10, device='cpu'):
         ## sample non matches
@@ -128,6 +128,39 @@ def descriptor_loss_sparse(descriptors, descriptors_warped, homographies, img, m
             create_non_matches(uv_to_tuple(uv_a), uv_b_non_matches_tuple, num_masked_non_matches_per_match)
         return uv_a_tuple, uv_b_non_matches_tuple
 
+    def get_non_matches_corr_focus_similar_interest_pts(img_b_shape, uv_a, uv_b_matches, matches_a_descriptors, matches_b_descriptors, num_masked_non_matches_per_match=10, device='cpu'):
+        ## sample non matches
+        uv_b_matches = uv_b_matches.squeeze()
+        uv_b_matches_tuple = uv_to_tuple(uv_b_matches) # (u: (1000,), v: (1000,))
+        uv_b_non_matches_tuple = correspondence_finder.create_non_correspondences_focus_similar_interst_pts(uv_a, uv_b_matches_tuple,
+                                        img_b_shape,
+                                        matches_a_descriptors, matches_b_descriptors,
+                                        num_non_matches_per_match=num_masked_non_matches_per_match,
+                                        img_b_mask=None) # find 100 pts to every pt # (u:(1000,100),v:(1000,100))
+        # pdb.set_trace()
+        ## create_non_correspondences
+        #     print("img_b_shape ", img_b_shape)
+        #     print("uv_b_matches ", uv_b_matches.shape)
+        # print("uv_a: ", uv_to_tuple(uv_a))
+        # print("uv_b_non_matches: ", uv_b_non_matches)
+        #     print("uv_b_non_matches: ", tensorUv2tuple(uv_b_non_matches))
+        # uv_b_non_matches_tuple[0].shape
+        # uv_b_matches.shape
+        # uv_a.shape
+        tmp = uv_to_tuple(uv_a)
+        tmp[0].shape
+        uv_a_long = (torch.t(tmp[0].repeat(100, 1)).contiguous().view(-1, 1), torch.t(tmp[1].repeat(100, 1)).contiguous().view(-1, 1))
+        uv_a_long[0].shape
+        uv_a_tuple, uv_b_non_matches_tuple = \
+            create_non_matches(uv_to_tuple(uv_a), uv_b_non_matches_tuple, num_masked_non_matches_per_match)
+        return uv_a_tuple, uv_b_non_matches_tuple
+    
+    def get_others_from_A_interest_pts(uv_a,image_a_pred, \
+                                            non_matches_ptsOnA= 50):
+        uv_a_tuple, uv_a_others_tuple = correspondence_finder.create_non_matches_on_A_interest_pts(uv_a,image_a_pred, non_matches_ptsOnA= 50)
+        return uv_a_tuple, uv_a_others_tuple
+
+
     def get_non_match_loss(image_a_pred, image_b_pred, non_matches_a, non_matches_b, dist='cos'):
         ## non matches loss
         non_match_loss, num_hard_negatives, non_matches_a_descriptors, non_matches_b_descriptors = \
@@ -139,8 +172,11 @@ def descriptor_loss_sparse(descriptors, descriptors_warped, homographies, img, m
         return non_match_loss
 
     def findInterestPoints(img, blockSize=2, ksize=1, k=0.1):
-        img_mean = torch.mean(img, dim=1)
-        result = torch.where(img_mean > 0, torch.tensor(1), torch.tensor(0)).cpu().numpy()[0]
+        if img.shape[1] == 1:
+            result = img.squeeze(1).numpy().astype(np.uint8)[0]
+        else:
+            imgmean = img.mean(1)
+            result = torch.where(imgmean > 0, torch.tensor(1), torch.tensor(0)).cpu().numpy()[0]
         # Apply Harris corner detection
         # Adjust the parameter k to control sensitivity to corners
         # You may need to experiment with different values of k
@@ -203,6 +239,7 @@ def descriptor_loss_sparse(descriptors, descriptors_warped, homographies, img, m
         uv_b_matches
 
     uv_a = uv_a[mask] # then filter out uv_a (points before warpped)
+
     if uv_a.shape[0] == 0:
         print("uv_a return None!!!!!!!!!!!!!!!!!!")
         return None, None, None 
@@ -210,38 +247,70 @@ def descriptor_loss_sparse(descriptors, descriptors_warped, homographies, img, m
     # crop to the same length
     shuffle = True
     if not shuffle: print("shuffle: ", shuffle)
+    
+    # pdb.set_trace()
+    if (0):
+        uv_a.shape
+        uv_a.min()
     choice = crop_or_pad_choice(uv_b_matches.shape[0], num_matching_attempts, shuffle=shuffle)
     # resample the points to be a index array with fixed amount=1000
     choice = torch.tensor(choice).type(torch.int64)
-    choice.shape
+    uv_a_original = torch.clone(uv_a)
     uv_a = uv_a[choice]
     uv_b_matches = uv_b_matches[choice]
 
     if method == '2d':
         matches_a = normPts(uv_a, torch.tensor([Wc, Hc]).float()) # [u, v] # [-1,1]
         matches_b = normPts(uv_b_matches, torch.tensor([Wc, Hc]).float()) # [-1,1]
+        matches_a_original = normPts(uv_a_original, torch.tensor([Wc, Hc]).float()) # [u, v] # [-1,1]
     else:
         matches_a = uv_to_1d(uv_a, Wc)
         matches_b = uv_to_1d(uv_b_matches, Wc)
 
 
+
     # important loss
     if method == '2d':
-        match_loss = get_match_loss(descriptors, descriptors_warped, matches_a.to(device), 
+        match_loss, matches_a_descriptors, matches_b_descriptors = get_match_loss(descriptors, descriptors_warped, matches_a.to(device), 
             matches_b.to(device), dist=dist, method='2d')
     else:
-        match_loss = get_match_loss(image_a_pred, image_b_pred, 
+        match_loss, matches_a_descriptors, matches_b_descriptors = get_match_loss(image_a_pred, image_b_pred, 
             matches_a.long().to(device), matches_b.long().to(device), dist=dist)
 
     # non matches
+    # uv_a_tuple, uv_a_others_tuple = get_others_from_A_interest_pts(matches_a_original,\
+    #                                         descriptors, \
+    #                                         non_matches_ptsOnA= 50)
 
+
+
+    if (1): # for debug printout
+        print("uv_a 0 : ", matches_a[:,0].min(), matches_a[:,0].max())
+        print("uv_a 1 : ", matches_a[:,1].min(), matches_a[:,1].max())
+        print("uv_b 0 : ", matches_b[:,0].min(), matches_b[:,0].max())
+        print("uv_b 1 : ", matches_b[:,1].min(), matches_b[:,1].max())
+        
     # get non matches correspondence
     uv_a_tuple, uv_b_non_matches_tuple = get_non_matches_corr(img_shape,
                                             uv_a, uv_b_matches,
                                             num_masked_non_matches_per_match=num_masked_non_matches_per_match)
+
+
   
+    # uv_a_tuple, uv_b_non_matches_tuple = get_non_matches_corr_focus_similar_interest_pts(img_shape,\
+    #                                         uv_a, uv_b_matches,\
+    #                                         matches_a_descriptors, matches_b_descriptors,\
+    #                                         num_masked_non_matches_per_match=num_masked_non_matches_per_match)
+
     non_matches_a = tuple_to_1d(uv_a_tuple, Wc)
     non_matches_b = tuple_to_1d(uv_b_non_matches_tuple, Wc)
+    if (1): # for debug printout
+        print("uv_a_tuple 0 : ", uv_a_tuple[0].min(), uv_a_tuple[0].max())
+        print("uv_a_tuple 1 : ", uv_a_tuple[1].min(), uv_a_tuple[1].max())
+        print("uv_b_nontuple 0 : ", uv_b_non_matches_tuple[0].min(), uv_b_non_matches_tuple[0].max())
+        print("uv_b_nontuple 1 : ", uv_b_non_matches_tuple[1].min(), uv_b_non_matches_tuple[1].max())
+
+        
 
     non_match_loss = get_non_match_loss(image_a_pred, image_b_pred, non_matches_a.to(device),
                                         non_matches_b.to(device), dist=dist)

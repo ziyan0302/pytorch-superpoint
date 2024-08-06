@@ -9,10 +9,10 @@ from models.unet_parts import *
 import numpy as np
 
 # from models.SubpixelNet import SubpixelNet
-class SuperPointNet_gauss2event_delta(torch.nn.Module):
+class SuperPointNet_gauss2event_offset(torch.nn.Module):
     """ Pytorch definition of SuperPoint Network. """
     def __init__(self, subpixel_channel=1):
-        super(SuperPointNet_gauss2event_delta, self).__init__()
+        super(SuperPointNet_gauss2event_offset, self).__init__()
         c1, c2, c3, c4, c5, d1 = 64, 64, 128, 128, 256, 256
         det_h = 65
         # self.inc = inconv(1, c1)

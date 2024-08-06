@@ -1,6 +1,6 @@
 data:
     # name: 'mvsec'
-    dataset: 'Mvsec' # 'coco'
+    dataset: 'MvsecImg' # 'coco'
     dataset_info: 'datasets/mvsec_dataset/mvsec_dataset.txt'
 
     
@@ -51,23 +51,22 @@ data:
 
 # front_end_model: 'Train_model_heatmap_mvsec_pl'  # 'Train_model_frontend'
 # front_end_model: 'Train_model_heatmap_mvsec_offset'  # 'Train_model_frontend'
-front_end_model: 'Train_model_heatmap_mvsec'  # 'Train_model_frontend'
+front_end_model: 'Train_model_heatmap_mvsecImg'  # 'Train_model_frontend'
 
 training:
-    workers_train: 1 #16
-    workers_val: 1 #2
+    workers_train: 0 #16
+    workers_val: 0 #2
 
 model:
 
-    name: 'SuperPointNet_gauss2event'
-    # name: 'SuperPointNet_gauss2event_offset'
+    name: 'SuperPointNet_gauss2'
     params: {
     }
     detector_loss:
         loss_type: 'softmax'
 
 
-    batch_size: 8 # 32
+    batch_size: 1 # 32
     eval_batch_size: 8 # 32
     learning_rate: 0.0001 # 0.0001
     detection_threshold: 0.015 # 0.015
@@ -86,10 +85,10 @@ model:
             lamda_d: 1.0
             dist: 'cos'
             method: '2d'
-            pos_margin: 0.7
-            neg_margin: 0.1
-            pts_sample_rate: 2
+
     other_settings: 'train 2d, gauss 0.2'
+    pretrained: "/home/ziyan/02_research/pytorch-superpoint/logs/superpoint_mvsecImg/2024-08-02_05-28/checkpoints/superPointNet_8000_checkpoint.pth.tar"
+
 retrain: True # set true for new model
 reset_iter: True # set true to set the iteration number to 0
 train_iter: 8000 # 4000 # 170000
